@@ -589,14 +589,8 @@
       const sum = nums.reduce((a,b)=>a+b,0);
       cards.push({label:"ยอดรวม (" + state.amountCol + ")", value: fmtBaht(sum), color:"violet"});
       let avgPerMonth = null;
-      if (state.yearCol && state.monthCol) {
-        const monthKeys = new Set();
-        rows.forEach(r=>{
-          const y = String(r[state.yearCol]||"").trim(); const mi = monthIndexOf(r[state.monthCol]);
-          if (y && mi !== null) monthKeys.add(y + "-" + mi);
-        });
-        avgPerMonth = monthKeys.size ? sum / monthKeys.size : 0;
-      }
+      const nMonths = distinctMonthCount(rows);
+      if (nMonths !== null) avgPerMonth = nMonths ? sum / nMonths : 0;
       cards.push({label:"ค่าเฉลี่ยต่อเดือน", value: avgPerMonth !== null ? fmtBaht(avgPerMonth) : "–", color:"emerald"});
     }
     cards.forEach(c=>{
@@ -625,6 +619,16 @@
     return null;
   }
 
+  function distinctMonthCount(rows){
+    if (!state.yearCol || !state.monthCol) return null;
+    const set = new Set();
+    rows.forEach(r=>{
+      const y = String(r[state.yearCol]||"").trim(); const mi = monthIndexOf(r[state.monthCol]);
+      if (y && mi !== null) set.add(y + "-" + mi);
+    });
+    return set.size;
+  }
+
   function renderTrend(){
     const section = $("#trendSection");
     if (!state.yearCol || !state.monthCol || !state.amountCol) { section.style.display = "none"; return; }
@@ -642,7 +646,7 @@
     const palette = chartColors();
     const datasets = years.map((y,i)=>({
       label: y, data: byYear[y], backgroundColor: palette[i % palette.length], borderRadius:5,
-      maxBarThickness:26, categoryPercentage:0.98, barPercentage:1.0
+      categoryPercentage:0.62, barPercentage:1.0
     }));
     const ctx = $("#trendChart").getContext("2d");
     if (state.trendChart) state.trendChart.destroy();
@@ -775,8 +779,9 @@
         const mi = monthIndexOf(r[state.monthCol]); if (mi === null) return;
         totals[mi] += parseNumberValue(r[state.amountCol]) || 0;
       });
-      const monthsWithData = totals.filter(v=>v!==0).length;
-      const avgPerMonth = monthsWithData ? totals.reduce((a,b)=>a+b,0) / monthsWithData : 0;
+      const nMonths = distinctMonthCount(scoped);
+      const totalSum = totals.reduce((a,b)=>a+b,0);
+      const avgPerMonth = nMonths ? totalSum / nMonths : 0;
       $("#productMonthTitle").textContent = "แนวโน้มรายเดือน" + suffix + ` · เฉลี่ย ${fmtBaht(avgPerMonth)}/เดือน`;
       drawSimpleBar("productMonthChart", MONTH_ABBR_EN, totals, { horizontal:false, color:"#FFC069" });
     }
