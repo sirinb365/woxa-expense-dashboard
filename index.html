@@ -586,9 +586,18 @@
     cards.push({label:"จำนวนรายการ", value: fmtNum(rows.length,0), color:"cyan", sub: rows.length!==state.rows.length ? `จากทั้งหมด ${state.rows.length.toLocaleString("th-TH")} รายการ` : "ทั้งหมด"});
     if (state.amountCol) {
       const nums = rows.map(r=>parseNumberValue(r[state.amountCol])).filter(v=>v!==null);
-      const sum = nums.reduce((a,b)=>a+b,0); const avg = nums.length? sum/nums.length : 0;
+      const sum = nums.reduce((a,b)=>a+b,0);
       cards.push({label:"ยอดรวม (" + state.amountCol + ")", value: fmtBaht(sum), color:"violet"});
-      cards.push({label:"ค่าเฉลี่ยต่อรายการ", value: fmtBaht(avg), color:"emerald"});
+      let avgPerMonth = null;
+      if (state.yearCol && state.monthCol) {
+        const monthKeys = new Set();
+        rows.forEach(r=>{
+          const y = String(r[state.yearCol]||"").trim(); const mi = monthIndexOf(r[state.monthCol]);
+          if (y && mi !== null) monthKeys.add(y + "-" + mi);
+        });
+        avgPerMonth = monthKeys.size ? sum / monthKeys.size : 0;
+      }
+      cards.push({label:"ค่าเฉลี่ยต่อเดือน", value: avgPerMonth !== null ? fmtBaht(avgPerMonth) : "–", color:"emerald"});
     }
     cards.forEach(c=>{
       const el = document.createElement("div");
@@ -633,7 +642,7 @@
     const palette = chartColors();
     const datasets = years.map((y,i)=>({
       label: y, data: byYear[y], backgroundColor: palette[i % palette.length], borderRadius:5,
-      maxBarThickness:26, categoryPercentage:0.9, barPercentage:0.98
+      maxBarThickness:26, categoryPercentage:0.98, barPercentage:1.0
     }));
     const ctx = $("#trendChart").getContext("2d");
     if (state.trendChart) state.trendChart.destroy();
@@ -738,9 +747,9 @@
     section.style.display = "";
     const baseRows = state.filteredRows;
 
-    const productAll = topBreakdown(baseRows, state.productCol, Infinity);
-    setChartWrapHeight("productChart", productAll.length);
-    drawSimpleBar("productChart", productAll.map(e=>e.value), productAll.map(e=>e.total), {
+    const productTop = topBreakdown(baseRows, state.productCol, 10);
+    setChartWrapHeight("productChart", productTop.length);
+    drawSimpleBar("productChart", productTop.map(e=>e.value), productTop.map(e=>e.total), {
       color:"#8B7CF6", focus: state.productFocus,
       onClick:(label)=>{
         state.productFocus = state.productFocus === label ? null : label;
@@ -755,18 +764,20 @@
 
     $("#productTeamTitle").textContent = "แยกตาม Team" + suffix;
     if (state.teamCol) {
-      const teamAll = topBreakdown(scoped, state.teamCol, Infinity);
-      setChartWrapHeight("productTeamChart", teamAll.length);
-      drawSimpleBar("productTeamChart", teamAll.map(e=>e.value), teamAll.map(e=>e.total), { color:"#38DBEA" });
+      const teamTop = topBreakdown(scoped, state.teamCol, 10);
+      setChartWrapHeight("productTeamChart", teamTop.length);
+      drawSimpleBar("productTeamChart", teamTop.map(e=>e.value), teamTop.map(e=>e.total), { color:"#38DBEA" });
     }
 
-    $("#productMonthTitle").textContent = "แนวโน้มรายเดือน" + suffix;
     if (state.monthCol) {
       const totals = Array(12).fill(0);
       scoped.forEach(r=>{
         const mi = monthIndexOf(r[state.monthCol]); if (mi === null) return;
         totals[mi] += parseNumberValue(r[state.amountCol]) || 0;
       });
+      const monthsWithData = totals.filter(v=>v!==0).length;
+      const avgPerMonth = monthsWithData ? totals.reduce((a,b)=>a+b,0) / monthsWithData : 0;
+      $("#productMonthTitle").textContent = "แนวโน้มรายเดือน" + suffix + ` · เฉลี่ย ${fmtBaht(avgPerMonth)}/เดือน`;
       drawSimpleBar("productMonthChart", MONTH_ABBR_EN, totals, { horizontal:false, color:"#FFC069" });
     }
   }
