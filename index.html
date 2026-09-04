@@ -29,12 +29,7 @@
   html,body{margin:0;padding:0;}
   body{
     min-height:100vh;
-    background:
-      radial-gradient(1100px 750px at 8% -8%, rgba(139,124,246,.38), transparent 58%),
-      radial-gradient(950px 700px at 95% 0%, rgba(56,219,234,.30), transparent 55%),
-      radial-gradient(900px 850px at 40% 105%, rgba(255,111,160,.24), transparent 55%),
-      radial-gradient(700px 600px at 100% 90%, rgba(61,220,151,.18), transparent 55%),
-      var(--bg-base);
+    background: var(--bg-base);
     background-attachment:fixed;
     color:var(--ink);
     font-family:'IBM Plex Sans Thai', system-ui, sans-serif;
@@ -96,6 +91,7 @@
   .msg.loading{background:var(--amber-soft); color:#FFE3BB; display:block; border-color:var(--amber-border);}
 
   section{margin-bottom:26px;}
+  section[id]{scroll-margin-top:135px;}
   .section-title{font-size:12px; font-weight:600; color:var(--muted); margin-bottom:11px; display:flex; align-items:center; gap:8px; letter-spacing:.03em; text-transform:uppercase;}
   .section-title::after{content:""; flex:1; height:1px; background:var(--glass-border);}
 
@@ -192,9 +188,6 @@
   tbody td.num{font-family:'IBM Plex Mono',monospace; text-align:center;}
   tbody tr.clickable-row{cursor:pointer;}
   tbody tr:hover{background:rgba(255,255,255,.05);}
-  tbody tr.anomaly-row{background:var(--danger-soft);}
-  tbody tr.anomaly-row:hover{background:rgba(255,107,107,.24);}
-  .anomaly-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--danger); margin-right:7px; box-shadow:0 0 0 3px var(--danger-soft);}
   .mini-bar-cell{display:flex; align-items:center; gap:8px; justify-content:center;}
   .mini-bar-track{width:70px; height:5px; background:rgba(255,255,255,.1); border-radius:4px; overflow:hidden;}
   .mini-bar-fill{height:100%; background:linear-gradient(90deg, var(--violet), var(--cyan)); border-radius:4px;}
@@ -268,7 +261,7 @@
 
   <section id="productSection">
     <div class="section-title">วิเคราะห์ราย Product</div>
-    <div class="focus-hint">คลิกแท่ง Product เพื่อดู Team และแนวโน้มรายเดือนเฉพาะสินค้านั้น — คลิกซ้ำเพื่อยกเลิก</div>
+    <div class="focus-hint">คลิกแท่ง Product เพื่อดู Team และแนวโน้มรายเดือนเฉพาะ Product นั้น — คลิกซ้ำเพื่อยกเลิก</div>
     <div class="linked-chips" id="productFocusChip"></div>
     <div class="linked-grid-3">
       <div class="chart-card"><h3>ยอดรวมตาม Product</h3><div class="chart-wrap"><canvas id="productChart"></canvas></div></div>
@@ -308,7 +301,6 @@
     <div class="table-toolbar">
       <div class="table-toolbar-left">
         <input type="text" class="search-box" id="tableSearch" placeholder="ค้นหาในตาราง…">
-        <button class="toggle-chip" id="anomalyToggle">● แสดงเฉพาะรายการผิดปกติ</button>
       </div>
       <span id="rowCountLabel" style="font-size:12px; color:var(--muted);"></span>
     </div>
@@ -318,7 +310,7 @@
   </section>
 </main>
 
-<footer>จุดสีแดง/แถบไฮไลต์ในตาราง หมายถึงรายการที่มูลค่าเบี่ยงเบนจากช่วงปกติของข้อมูลอย่างมาก (คำนวณอัตโนมัติด้วยสถิติ IQR) ควรตรวจสอบความถูกต้องเพิ่มเติม</footer>
+<footer>Woxa Expense Dashboard · ข้อมูลอัปเดตจาก Google Sheet</footer>
 
 <script>
 (function(){
@@ -336,7 +328,7 @@
     filters: {}, filteredRows: [],
     sortCol: null, sortDir: 1, page: 1, pageSize: 20, tableQuery: "",
     autoRefreshTimer: null, breakdownBarChart: null, breakdownDonutChart: null, trendChart: null,
-    activeDimension: null, anomalyBounds: null, anomalyIds: new Set(), showAnomalyOnly: false,
+    activeDimension: null,
     drill: null,
     productCol: null, teamCol: null, mainCatCol: null, subCatCol: null,
     productFocus: null, categoryFocus: null, chartInstances: {},
@@ -392,20 +384,6 @@
     return best;
   }
 
-  // ---- Anomaly detection (IQR) ----
-  function computeAnomalies(){
-    state.anomalyIds = new Set(); state.anomalyBounds = null;
-    if (!state.amountCol) return;
-    const nums = state.rows.map(r=>parseNumberValue(r[state.amountCol])).filter(v=>v!==null).sort((a,b)=>a-b);
-    if (nums.length < 8) return;
-    const q = (p)=>{ const idx=(nums.length-1)*p; const lo=Math.floor(idx), hi=Math.ceil(idx); return nums[lo] + (nums[hi]-nums[lo])*(idx-lo); };
-    const q1=q(0.25), q3=q(0.75), iqr=q3-q1;
-    const lower=q1-1.5*iqr, upper=q3+1.5*iqr;
-    state.anomalyBounds = {lower, upper};
-    state.rows.forEach((r, idx)=>{ const v = parseNumberValue(r[state.amountCol]); if (v!==null && (v<lower||v>upper)) state.anomalyIds.add(idx); });
-  }
-  function rowIndexKey(row){ return state.rows.indexOf(row); }
-
   function setStatus(text){ $("#statusPill").innerHTML = '<span class="status-dot"></span>' + text; }
   function showError(msg){ const el=$("#errorMsg"); el.textContent=msg; el.style.display="block"; $("#loadingMsg").style.display="none"; }
   function hideMsgs(){ $("#errorMsg").style.display="none"; $("#loadingMsg").style.display="none"; }
@@ -429,8 +407,7 @@
         state.mainCatCol = resolveColumnName("Main Category", headers);
         state.subCatCol = resolveColumnName("Sub Category", headers);
         state.productFocus = null; state.categoryFocus = null;
-        computeAnomalies();
-        state.filters = {}; state.page = 1; state.showAnomalyOnly = false; state.drill = null;
+        state.filters = {}; state.page = 1; state.drill = null;
         state.activeDimension = resolveColumnName("Main Category", headers) && state.dimHeaders.includes(resolveColumnName("Main Category", headers))
           ? resolveColumnName("Main Category", headers) : state.dimHeaders[0];
         hideMsgs();
@@ -464,7 +441,6 @@
       const total = getValueCounts(state.rows, h).length;
       if (f.selected && f.selected.size > 0 && f.selected.size < total) rows = rows.filter(r => f.selected.has(String(r[h]||"").trim()));
     });
-    if (state.showAnomalyOnly) rows = rows.filter(r => state.anomalyIds.has(rowIndexKey(r)));
     if (state.tableQuery.trim() !== "") {
       const q = state.tableQuery.trim().toLowerCase();
       rows = rows.filter(r => state.headers.some(h => String(r[h]||"").toLowerCase().includes(q)));
@@ -484,10 +460,9 @@
     try { renderTable(); } catch(e){ console.error("renderTable failed:", e); }
     renderActiveChips();
     updateFacetCounts();
-    $("#anomalyToggle").classList.toggle("on", state.showAnomalyOnly);
   }
 
-  // Rows filtered by every active dimension filter EXCEPT the given column, plus search + anomaly toggle —
+  // Rows filtered by every active dimension filter EXCEPT the given column, plus search —
   // this is what a filter panel's option counts should reflect ("real-time" faceted counts).
   function rowsExcludingFilter(excludeCol){
     let rows = state.rows;
@@ -497,7 +472,6 @@
       const total = getValueCounts(state.rows, h).length;
       if (f.selected && f.selected.size > 0 && f.selected.size < total) rows = rows.filter(r => f.selected.has(String(r[h]||"").trim()));
     });
-    if (state.showAnomalyOnly) rows = rows.filter(r => state.anomalyIds.has(rowIndexKey(r)));
     if (state.tableQuery.trim() !== "") {
       const q = state.tableQuery.trim().toLowerCase();
       rows = rows.filter(r => state.headers.some(h => String(r[h]||"").toLowerCase().includes(q)));
@@ -577,7 +551,7 @@
 
     const clearBtn = document.createElement("button");
     clearBtn.className = "clear-all"; clearBtn.textContent = "✕ ล้างตัวกรองทั้งหมด";
-    clearBtn.addEventListener("click", ()=>{ state.filters = {}; state.showAnomalyOnly=false; state.drill=null; renderDrillChip(); renderFilters(); refreshAll(); });
+    clearBtn.addEventListener("click", ()=>{ state.filters = {}; state.drill=null; renderDrillChip(); renderFilters(); refreshAll(); });
     bar.appendChild(clearBtn);
 
     document.addEventListener("click", (e)=>{
@@ -603,13 +577,6 @@
       chip.querySelector("button").addEventListener("click", ()=>{ delete state.filters[h]; renderFilters(); refreshAll(); });
       wrap.appendChild(chip);
     });
-    if (state.showAnomalyOnly) {
-      const chip = document.createElement("div"); chip.className = "chip";
-      chip.style.background = "var(--danger-soft)"; chip.style.color = "var(--danger)"; chip.style.borderColor = "var(--danger-border)";
-      chip.innerHTML = `<span>เฉพาะรายการผิดปกติ</span><button style="color:var(--danger)">✕</button>`;
-      chip.querySelector("button").addEventListener("click", ()=>{ state.showAnomalyOnly=false; refreshAll(); });
-      wrap.appendChild(chip);
-    }
   }
 
   // ---------- KPI ----------
@@ -622,16 +589,11 @@
       const sum = nums.reduce((a,b)=>a+b,0); const avg = nums.length? sum/nums.length : 0;
       cards.push({label:"ยอดรวม (" + state.amountCol + ")", value: fmtBaht(sum), color:"violet"});
       cards.push({label:"ค่าเฉลี่ยต่อรายการ", value: fmtBaht(avg), color:"emerald"});
-      if (state.anomalyBounds) {
-        const anomalyCount = rows.filter(r=>state.anomalyIds.has(rowIndexKey(r))).length;
-        cards.push({label:"รายการผิดปกติ", value: fmtNum(anomalyCount,0), warn:true, color:"pink", sub:"คลิกเพื่อดูเฉพาะรายการนี้"});
-      }
     }
     cards.forEach(c=>{
       const el = document.createElement("div");
-      el.className = "stat-card c-" + c.color + (c.warn?" warn":"") + (c.warn && state.showAnomalyOnly ? " on":"");
+      el.className = "stat-card c-" + c.color;
       el.innerHTML = `<div class="label">${c.label}</div><div class="value">${c.value}</div>${c.sub?`<div class="sub">${c.sub}</div>`:""}`;
-      if (c.warn) el.addEventListener("click", ()=>{ state.showAnomalyOnly = !state.showAnomalyOnly; refreshAll(); });
       grid.appendChild(el);
     });
   }
@@ -670,7 +632,8 @@
     const years = Object.keys(byYear).sort();
     const palette = chartColors();
     const datasets = years.map((y,i)=>({
-      label: y, data: byYear[y], backgroundColor: palette[i % palette.length], borderRadius:5, maxBarThickness:24
+      label: y, data: byYear[y], backgroundColor: palette[i % palette.length], borderRadius:5,
+      maxBarThickness:26, categoryPercentage:0.9, barPercentage:0.98
     }));
     const ctx = $("#trendChart").getContext("2d");
     if (state.trendChart) state.trendChart.destroy();
@@ -678,6 +641,7 @@
       type:"bar",
       data:{ labels: MONTH_ABBR_EN, datasets },
       options:{ responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:"nearest", intersect:false },
         onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
         onClick:(evt, els)=>{
           if (!els.length) return;
@@ -741,6 +705,7 @@
       type:"bar",
       data:{ labels, datasets:[{ data, backgroundColor: colors, borderRadius:4 }] },
       options:{ indexAxis: horizontal ? "y" : "x", responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:"nearest", axis: horizontal ? "y" : "x", intersect:false },
         onHover:(evt, els)=>{ evt.native.target.style.cursor = (opts.onClick && els.length) ? "pointer" : "default"; },
         onClick: opts.onClick ? (evt, els)=>{ if (!els.length) return; opts.onClick(labels[els[0].index]); } : undefined,
         plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(c)=> " " + fmtBaht(horizontal ? c.parsed.x : c.parsed.y)}} },
@@ -761,14 +726,21 @@
   }
 
   // ---------- Product Analysis (Product -> Team + Monthly, linked by click) ----------
+  function setChartWrapHeight(canvasId, barCount){
+    const el = $("#" + canvasId); if (!el) return;
+    const wrap = el.closest(".chart-wrap"); if (!wrap) return;
+    wrap.style.height = Math.max(280, barCount * 30) + "px";
+  }
+
   function renderProductAnalysis(){
     const section = $("#productSection");
     if (!state.productCol) { section.style.display = "none"; return; }
     section.style.display = "";
     const baseRows = state.filteredRows;
 
-    const productTop = topBreakdown(baseRows, state.productCol, 10);
-    drawSimpleBar("productChart", productTop.map(e=>e.value), productTop.map(e=>e.total), {
+    const productAll = topBreakdown(baseRows, state.productCol, Infinity);
+    setChartWrapHeight("productChart", productAll.length);
+    drawSimpleBar("productChart", productAll.map(e=>e.value), productAll.map(e=>e.total), {
       color:"#8B7CF6", focus: state.productFocus,
       onClick:(label)=>{
         state.productFocus = state.productFocus === label ? null : label;
@@ -783,8 +755,9 @@
 
     $("#productTeamTitle").textContent = "แยกตาม Team" + suffix;
     if (state.teamCol) {
-      const teamTop = topBreakdown(scoped, state.teamCol, 10);
-      drawSimpleBar("productTeamChart", teamTop.map(e=>e.value), teamTop.map(e=>e.total), { color:"#38DBEA" });
+      const teamAll = topBreakdown(scoped, state.teamCol, Infinity);
+      setChartWrapHeight("productTeamChart", teamAll.length);
+      drawSimpleBar("productTeamChart", teamAll.map(e=>e.value), teamAll.map(e=>e.total), { color:"#38DBEA" });
     }
 
     $("#productMonthTitle").textContent = "แนวโน้มรายเดือน" + suffix;
@@ -881,6 +854,7 @@
       type:"bar",
       data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderRadius:4 }] },
       options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:"nearest", axis:"y", intersect:false },
         onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
         onClick:(evt, els)=>{
           if (!els.length) return;
@@ -1017,14 +991,11 @@
       const frag = document.createDocumentFragment();
       rows.forEach(r=>{
         const tr = document.createElement("tr");
-        const isAnomaly = state.anomalyIds.has(rowIndexKey(r));
-        if (isAnomaly) tr.classList.add("anomaly-row");
         state.headers.forEach((h, i)=>{
           const td = document.createElement("td");
           if (h === state.amountCol) td.className = "num";
           let val = r[h] !== undefined && r[h] !== null ? r[h] : "";
-          if (i === 0 && isAnomaly) td.innerHTML = `<span class="anomaly-dot" title="ค่าผิดปกติ"></span>${val}`;
-          else td.textContent = val;
+          td.textContent = val;
           tr.appendChild(td);
         });
         frag.appendChild(tr);
@@ -1043,7 +1014,6 @@
     else if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
   });
   $("#tableSearch").addEventListener("input", (e)=>{ state.tableQuery = e.target.value; applyFilters(); renderTable(); });
-  $("#anomalyToggle").addEventListener("click", ()=>{ state.showAnomalyOnly = !state.showAnomalyOnly; refreshAll(); });
 
   // ---------- Section nav (smooth scroll + scrollspy) ----------
   const navLinks = $$(".nav-link");
