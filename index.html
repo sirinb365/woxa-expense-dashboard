@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Woxa Expense Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg-base:#0B0E1E;
+    --violet:#8B7CF6; --violet-soft:rgba(139,124,246,.18); --violet-border:rgba(139,124,246,.4);
+    --cyan:#38DBEA; --cyan-soft:rgba(56,219,234,.16); --cyan-border:rgba(56,219,234,.38);
+    --amber:#FFC069; --amber-soft:rgba(255,192,105,.16); --amber-border:rgba(255,192,105,.38);
+    --pink:#FF6FA0; --pink-soft:rgba(255,111,160,.16); --pink-border:rgba(255,111,160,.4);
+    --emerald:#3DDC97; --emerald-soft:rgba(61,220,151,.16); --emerald-border:rgba(61,220,151,.38);
+    --danger:#FF6B6B; --danger-soft:rgba(255,107,107,.18); --danger-border:rgba(255,107,107,.45);
+    --glass:rgba(255,255,255,.065); --glass-strong:rgba(255,255,255,.11); --glass-hover:rgba(255,255,255,.13);
+    --glass-border:rgba(255,255,255,.14); --glass-border-strong:rgba(255,255,255,.24);
+    --ink:#F5F6FC; --muted:rgba(245,246,252,.64); --muted-dim:rgba(245,246,252,.42);
+    --radius:18px; --radius-sm:12px;
+    --shadow: 0 8px 32px rgba(5,4,20,.45);
+    --blur: blur(22px) saturate(160%);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(1100px 750px at 8% -8%, rgba(139,124,246,.38), transparent 58%),
+      radial-gradient(950px 700px at 95% 0%, rgba(56,219,234,.30), transparent 55%),
+      radial-gradient(900px 850px at 40% 105%, rgba(255,111,160,.24), transparent 55%),
+      radial-gradient(700px 600px at 100% 90%, rgba(61,220,151,.18), transparent 55%),
+      var(--bg-base);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:'IBM Plex Sans Thai', system-ui, sans-serif;
+    font-size:14.5px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select{font-family:inherit;}
+  ::selection{background:var(--violet-soft); color:var(--ink);}
+
+  .glass{ background:var(--glass); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+    border:1px solid var(--glass-border); border-radius:var(--radius); box-shadow:var(--shadow); }
+
+  header.top{ position:sticky; top:0; z-index:50; background:rgba(11,14,30,.55); backdrop-filter:blur(18px);
+    border-bottom:1px solid var(--glass-border); padding:16px 28px; }
+  .top-inner{max-width:1400px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand-mark{display:flex; align-items:center; gap:12px;}
+  .brand-mark .glyph{
+    font-family:'IBM Plex Mono', monospace; font-size:17px; font-weight:700; color:#1B1030;
+    background:linear-gradient(135deg, var(--violet), var(--pink));
+    width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 14px rgba(139,124,246,.4);
+  }
+  h1{font-size:19px; font-weight:600; margin:0; letter-spacing:-0.01em; color:var(--ink);}
+  .brand-text{display:flex; flex-direction:column; gap:2px;}
+  .tagline{font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted-dim);}
+  .tagline span{background:linear-gradient(90deg, var(--violet), var(--pink)); -webkit-background-clip:text; background-clip:text; color:transparent; font-weight:600;}
+  .top-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .status-pill{font-size:12px; color:var(--muted); font-family:'IBM Plex Mono', monospace; display:flex; align-items:center; gap:6px;}
+  .status-dot{width:7px; height:7px; border-radius:50%; background:var(--emerald); box-shadow:0 0 0 3px var(--emerald-soft);}
+  .status-pill b{color:var(--ink); font-weight:500;}
+  .btn{border:1px solid var(--glass-border); background:var(--glass); color:var(--ink); padding:8px 14px; border-radius:10px; font-size:13px;
+    display:inline-flex; align-items:center; gap:6px; transition:background .15s ease, border-color .15s ease; backdrop-filter:var(--blur);}
+  .btn:hover{background:var(--glass-hover); border-color:var(--glass-border-strong);}
+  .btn.primary{background:linear-gradient(135deg, var(--violet), var(--pink)); color:#1B1030; border-color:transparent; font-weight:600; box-shadow:0 4px 16px rgba(139,124,246,.35);}
+  .btn.primary:hover{filter:brightness(1.08);}
+  .icon-btn{width:34px; height:34px; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass); color:var(--muted);
+    display:flex; align-items:center; justify-content:center; font-size:15px; backdrop-filter:var(--blur);}
+  .icon-btn:hover{color:var(--ink); border-color:var(--glass-border-strong);}
+
+  .settings-panel{display:none; position:absolute; right:28px; top:calc(100% + 8px); z-index:60;
+    background:rgba(20,18,40,.75); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:14px;
+    box-shadow:var(--shadow); padding:14px; width:360px;}
+  .settings-panel.open{display:block;}
+  .settings-panel label{font-size:11.5px; color:var(--muted); display:block; margin-bottom:5px;}
+  .settings-panel input[type=text]{width:100%; padding:8px 10px; border:1px solid var(--glass-border); border-radius:8px;
+    background:rgba(0,0,0,.25); color:var(--ink); font-size:12px; font-family:'IBM Plex Mono',monospace; margin-bottom:10px;}
+  .settings-panel .row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .settings-panel .auto-refresh{font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+
+  main{max-width:1400px; margin:0 auto; padding:22px 28px 80px;}
+
+  .section-nav{position:sticky; top:76px; z-index:45; background:rgba(11,14,30,.5); backdrop-filter:blur(14px); border-bottom:1px solid var(--glass-border);}
+  .section-nav-inner{max-width:1400px; margin:0 auto; padding:8px 28px; display:flex; gap:6px; overflow-x:auto;}
+  .nav-link{background:none; border:1px solid transparent; color:var(--muted); padding:6px 13px; border-radius:20px; font-size:12.5px; white-space:nowrap;}
+  .nav-link:hover{color:var(--ink);}
+  .nav-link.active{background:var(--violet-soft); border-color:var(--violet-border); color:#C9C0FF; font-weight:600;}
+  .msg{padding:13px 16px; border-radius:12px; font-size:13.5px; margin-bottom:18px; display:none; border:1px solid transparent; backdrop-filter:var(--blur);}
+  .msg.error{background:var(--danger-soft); color:#FFD3D3; display:block; border-color:var(--danger-border);}
+  .msg.loading{background:var(--amber-soft); color:#FFE3BB; display:block; border-color:var(--amber-border);}
+
+  section{margin-bottom:26px;}
+  .section-title{font-size:12px; font-weight:600; color:var(--muted); margin-bottom:11px; display:flex; align-items:center; gap:8px; letter-spacing:.03em; text-transform:uppercase;}
+  .section-title::after{content:""; flex:1; height:1px; background:var(--glass-border);}
+
+  /* Filters */
+  .filter-bar{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+  .filter-control{position:relative;}
+  .filter-btn{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:10px;
+    padding:8px 12px; font-size:13px; color:var(--ink); display:flex; align-items:center; gap:8px; min-width:120px;}
+  .filter-btn:hover{border-color:var(--glass-border-strong); background:var(--glass-hover);}
+  .filter-btn.active{border-color:var(--violet-border); background:var(--violet-soft);}
+  .filter-btn .cnt{background:var(--violet); color:#1B1030; font-size:10.5px; padding:1px 6px; border-radius:20px; font-family:'IBM Plex Mono', monospace; font-weight:700;}
+  .filter-btn .arrow{margin-left:auto; color:var(--muted); font-size:10px;}
+  .filter-panel{position:absolute; top:calc(100% + 6px); left:0; z-index:40; background:rgba(22,19,42,.8); backdrop-filter:var(--blur);
+    border:1px solid var(--glass-border); border-radius:14px; box-shadow:var(--shadow); min-width:230px; max-width:300px; padding:10px; display:none;}
+  .filter-panel.open{display:block;}
+  .filter-panel .search-mini{width:100%; padding:7px 9px; border:1px solid var(--glass-border); border-radius:8px; font-size:12.5px;
+    margin-bottom:8px; background:rgba(0,0,0,.25); color:var(--ink);}
+  .filter-panel .opt-list{max-height:220px; overflow-y:auto;}
+  .filter-panel .opt-row{display:flex; align-items:center; gap:8px; padding:5px 4px; font-size:13px; border-radius:7px;}
+  .filter-panel .opt-row:hover{background:rgba(255,255,255,.08);}
+  .filter-panel .opt-row label{flex:1; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink);}
+  .filter-panel .opt-row .cnt-small{color:var(--muted-dim); font-size:10.5px;}
+  .filter-panel .opt-row.zero{opacity:.4;}
+  .filter-panel .panel-actions{display:flex; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:1px solid var(--glass-border);}
+  .link-btn{background:none; border:none; color:var(--cyan); font-size:12px; font-weight:600; padding:2px 4px;}
+  .link-btn:hover{color:#7EE9F2;}
+  .clear-all{background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); color:var(--muted); border-radius:10px; padding:8px 12px; font-size:13px;}
+  .clear-all:hover{border-color:var(--danger-border); color:var(--danger);}
+  .active-chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:10px;}
+  .drill-chip-wrap{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px;}
+  .drill-chip-wrap:empty{display:none;}
+  .chip{display:flex; align-items:center; gap:6px; background:var(--violet-soft); color:#C9C0FF; border:1px solid var(--violet-border);
+    border-radius:20px; padding:5px 6px 5px 11px; font-size:12px;}
+  .chip button{background:none; border:none; color:#C9C0FF; font-size:13px; line-height:1; padding:2px;}
+
+  /* KPI cards */
+  .summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px;}
+  .stat-card{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:var(--radius);
+    padding:16px 18px; position:relative; overflow:hidden;}
+  .stat-card::before{content:""; position:absolute; top:0; left:0; right:0; height:3px;}
+  .stat-card.c-violet::before{background:linear-gradient(90deg, var(--violet), transparent);}
+  .stat-card.c-cyan::before{background:linear-gradient(90deg, var(--cyan), transparent);}
+  .stat-card.c-amber::before{background:linear-gradient(90deg, var(--amber), transparent);}
+  .stat-card.c-emerald::before{background:linear-gradient(90deg, var(--emerald), transparent);}
+  .stat-card.c-pink::before{background:linear-gradient(90deg, var(--danger), transparent);}
+  .stat-card .label{font-size:11.5px; color:var(--muted); margin-bottom:8px;}
+  .stat-card .value{font-size:21px; font-weight:600; font-family:'IBM Plex Mono',monospace; letter-spacing:-.01em; color:var(--ink);
+    overflow-wrap:break-word; word-break:break-word; line-height:1.25;}
+  .stat-card.c-violet .value{color:#C9C0FF;}
+  .stat-card.c-cyan .value{color:#A6EFF5;}
+  .stat-card.c-amber .value{color:#FFDDA8;}
+  .stat-card.c-emerald .value{color:#A5F0D2;}
+  .stat-card.c-pink .value{color:#FFB3C8;}
+  .stat-card .sub{font-size:11.5px; color:var(--muted-dim); margin-top:6px;}
+  .stat-card.warn{border-color:var(--danger-border); cursor:pointer; transition:background .15s ease;}
+  .stat-card.warn:hover{background:var(--danger-soft);}
+  .stat-card.warn.on{background:var(--danger-soft);}
+
+  /* Trend */
+  .trend-card{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:var(--radius); padding:18px;}
+  .trend-card .chart-wrap{height:220px; position:relative;}
+
+  /* Dimension tabs */
+  .dim-tabs{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px;}
+  .dim-tab{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); color:var(--muted);
+    border-radius:20px; padding:7px 14px; font-size:12.5px;}
+  .dim-tab:hover{color:var(--ink); border-color:var(--glass-border-strong);}
+  .dim-tab.active{background:linear-gradient(135deg, var(--violet), var(--pink)); color:#1B1030; border-color:transparent; font-weight:600;
+    box-shadow:0 4px 14px rgba(139,124,246,.35);}
+
+  .breakdown-grid{display:grid; grid-template-columns:1.15fr .85fr; gap:14px; margin-bottom:14px;}
+  @media (max-width:900px){.breakdown-grid{grid-template-columns:1fr;}}
+  .chart-card{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:var(--radius); padding:18px;}
+  .chart-card h3{margin:0 0 10px; font-size:13.5px; font-weight:600; color:var(--ink);}
+  .chart-card .chart-wrap{height:280px; position:relative;}
+
+  /* Tables (shared) */
+  .table-wrap{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:var(--radius); overflow:auto;}
+  #rawTableWrap{max-height:70vh; overflow-y:auto;}
+  table{border-collapse:collapse; width:100%; font-size:12.5px;}
+  thead th{position:sticky; top:0; background:rgba(24,20,46,.82); backdrop-filter:blur(10px); color:var(--muted); text-align:left; padding:11px 12px;
+    font-weight:600; white-space:nowrap; cursor:pointer; user-select:none; border-bottom:1px solid var(--glass-border); font-size:11.5px;}
+  thead th:hover{color:var(--ink);}
+  thead th .sort-arrow{color:var(--amber); margin-left:4px; font-size:10px;}
+  tbody td{padding:9px 12px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap; color:var(--ink);}
+  thead th.num{text-align:center;}
+  tbody td.num{font-family:'IBM Plex Mono',monospace; text-align:center;}
+  tbody tr.clickable-row{cursor:pointer;}
+  tbody tr:hover{background:rgba(255,255,255,.05);}
+  tbody tr.anomaly-row{background:var(--danger-soft);}
+  tbody tr.anomaly-row:hover{background:rgba(255,107,107,.24);}
+  .anomaly-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--danger); margin-right:7px; box-shadow:0 0 0 3px var(--danger-soft);}
+  .mini-bar-cell{display:flex; align-items:center; gap:8px; justify-content:center;}
+  .mini-bar-track{width:70px; height:5px; background:rgba(255,255,255,.1); border-radius:4px; overflow:hidden;}
+  .mini-bar-fill{height:100%; background:linear-gradient(90deg, var(--violet), var(--cyan)); border-radius:4px;}
+  .empty-row td{text-align:center; color:var(--muted); padding:26px;}
+
+  .table-toolbar{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap;}
+  .table-toolbar-left{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .search-box{ padding:8px 12px; border:1px solid var(--glass-border); border-radius:10px; font-size:13px; min-width:220px;
+    background:var(--glass); backdrop-filter:var(--blur); color:var(--ink);}
+  .toggle-chip{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--muted); border:1px solid var(--glass-border);
+    border-radius:20px; padding:6px 12px; background:var(--glass); backdrop-filter:var(--blur);}
+  .toggle-chip.on{border-color:var(--danger-border); color:#FFB3B3; background:var(--danger-soft);}
+  .pager{display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:10px; font-size:12.5px; color:var(--muted);}
+  .pager button{border:1px solid var(--glass-border); background:var(--glass); color:var(--ink); border-radius:8px; padding:5px 10px; backdrop-filter:var(--blur);}
+  .pager button:disabled{opacity:.35; cursor:default;}
+
+  footer{max-width:1400px; margin:0 auto; padding:0 28px 40px; color:var(--muted-dim); font-size:11.5px;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand-mark"><span class="glyph">฿</span>
+      <div class="brand-text">
+        <h1>Woxa Expense Dashboard</h1>
+        <div class="tagline">Powered by <span>Efficiency Team</span></div>
+      </div>
+    </div>
+    <div class="top-controls">
+      <span class="status-pill" id="statusPill"><span class="status-dot"></span>กำลังโหลด…</span>
+      <button class="icon-btn" id="settingsBtn" title="ตั้งค่าแหล่งข้อมูล">⚙</button>
+      <button class="btn primary" id="refreshBtn">↻ รีเฟรช</button>
+    </div>
+  </div>
+  <div class="settings-panel" id="settingsPanel">
+    <label for="csvUrlInput">แหล่งข้อมูล (CSV link)</label>
+    <input type="text" id="csvUrlInput" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vSd1du0JorbND03SXud77Gma28BJRvXfbylNIjO4KKVcueUsCLdLa8BEGrSSuxezVhdyz4u8Y0oVMZQ/pub?output=csv">
+    <div class="row"><button class="btn" id="loadUrlBtn" style="flex:1;">โหลดลิงก์นี้</button></div>
+    <div class="row" style="margin-top:10px;"><label class="auto-refresh"><input type="checkbox" id="autoRefreshChk"> รีเฟรชอัตโนมัติทุก 60 วินาที</label></div>
+  </div>
+</header>
+
+<nav class="section-nav" id="sectionNav">
+  <div class="section-nav-inner">
+    <button class="nav-link" data-target="kpiSection">สรุปภาพรวม</button>
+    <button class="nav-link" data-target="trendSection">แนวโน้มรายเดือน</button>
+    <button class="nav-link" data-target="breakdownSection">แยกตามมิติ</button>
+    <button class="nav-link" data-target="rawDataSection">Raw Data</button>
+  </div>
+</nav>
+
+<main>
+  <div class="msg loading" id="loadingMsg">กำลังดึงข้อมูลจาก Google Sheet…</div>
+  <div class="msg error" id="errorMsg"></div>
+
+  <section>
+    <div class="section-title">ตัวกรอง</div>
+    <div class="filter-bar" id="filterBar"></div>
+    <div class="active-chips" id="activeChips"></div>
+  </section>
+
+  <section id="kpiSection"><div class="summary-grid" id="summaryGrid"></div></section>
+
+  <section id="trendSection">
+    <div class="section-title">แนวโน้มรายเดือน</div>
+    <div class="trend-card"><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
+  </section>
+
+  <section id="breakdownSection">
+    <div class="section-title">แยกตามมิติ — เลือกดูได้ทุกมุม</div>
+    <div class="dim-tabs" id="dimTabs"></div>
+    <div class="breakdown-grid">
+      <div class="chart-card"><h3 id="breakdownBarTitle">ยอดรวม</h3><div class="chart-wrap"><canvas id="breakdownBarChart"></canvas></div></div>
+      <div class="chart-card"><h3>สัดส่วนตามเดือน</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="breakdownHeadRow"></tr></thead>
+        <tbody id="breakdownBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="rawDataSection">
+    <div class="section-title">Raw Data</div>
+    <div class="drill-chip-wrap" id="drillChipWrap"></div>
+    <div class="table-toolbar">
+      <div class="table-toolbar-left">
+        <input type="text" class="search-box" id="tableSearch" placeholder="ค้นหาในตาราง…">
+        <button class="toggle-chip" id="anomalyToggle">● แสดงเฉพาะรายการผิดปกติ</button>
+      </div>
+      <span id="rowCountLabel" style="font-size:12px; color:var(--muted);"></span>
+    </div>
+    <div class="table-wrap" id="rawTableWrap">
+      <table><thead><tr id="tableHeadRow"></tr></thead><tbody id="tableBody"></tbody></table>
+    </div>
+  </section>
+</main>
+
+<footer>จุดสีแดง/แถบไฮไลต์ในตาราง หมายถึงรายการที่มูลค่าเบี่ยงเบนจากช่วงปกติของข้อมูลอย่างมาก (คำนวณอัตโนมัติด้วยสถิติ IQR) ควรตรวจสอบความถูกต้องเพิ่มเติม</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- Fixed dimension columns (in display order) ----
+  const DIMENSION_COLUMNS = [
+    "Year","Month","Product","Account Name","Main Category","Sub Category","Account Name (New)",
+    "Detail","Company","ที่มา","Team","Category","Paid by Company","Frequency"
+  ];
+  const AMOUNT_HINTS = ["จำนวนเงิน","ยอด","ค่าใช้จ่าย","บาท","เงิน","amout","amount","cost","expense","price","total","revenue","budget"];
+
+  const state = {
+    headers: [], rows: [], dimHeaders: [], amountCol: null, yearCol: null, monthCol: null,
+    filters: {}, filteredRows: [],
+    sortCol: null, sortDir: 1, page: 1, pageSize: 20, tableQuery: "",
+    autoRefreshTimer: null, breakdownBarChart: null, breakdownDonutChart: null, trendChart: null,
+    activeDimension: null, anomalyBounds: null, anomalyIds: new Set(), showAnomalyOnly: false,
+    drill: null,
+    breakdownSortCol: "total", breakdownSortDir: -1
+  };
+
+  const $ = (sel, root) => (root||document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
+
+  function parseNumberValue(raw){
+    if (raw === null || raw === undefined) return null;
+    let s = String(raw).trim();
+    if (s === "" || s === "-") return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1,-1); }
+    s = s.replace(/[฿$,\s%]/g, "");
+    if (s === "" || s === "-") return null;
+    const n = Number(s);
+    if (isNaN(n)) return null;
+    return neg ? -Math.abs(n) : n;
+  }
+  function fmtNum(n, decimals){
+    if (n === null || n === undefined || isNaN(n)) return "–";
+    return n.toLocaleString("th-TH", {minimumFractionDigits: decimals||0, maximumFractionDigits: decimals||2});
+  }
+  function fmtBaht(n){
+    if (n === null || n === undefined || isNaN(n)) return "–";
+    return "฿" + n.toLocaleString("th-TH", {minimumFractionDigits:0, maximumFractionDigits:0});
+  }
+
+  function resolveColumnName(wanted, headers){
+    const norm = s => String(s).trim().toLowerCase().replace(/\s+/g," ");
+    let hit = headers.find(h => h === wanted);
+    if (hit) return hit;
+    hit = headers.find(h => norm(h) === norm(wanted));
+    return hit || null;
+  }
+
+  function pickAmountColumn(headers, rows, dimSet){
+    const candidates = headers.filter(h => !dimSet.has(h));
+    let best = null, bestScore = -Infinity;
+    candidates.forEach(h=>{
+      const values = rows.map(r=>r[h]).filter(v=>v!==undefined && v!==null && String(v).trim()!=="");
+      if (values.length === 0) return;
+      const nums = values.map(parseNumberValue).filter(v=>v!==null);
+      if (nums.length / values.length < 0.7) return; // not numeric enough
+      const sum = nums.reduce((a,b)=>a+Math.abs(b),0);
+      const lower = h.toLowerCase();
+      const hintBonus = AMOUNT_HINTS.some(hint => lower.includes(hint)) ? 1e15 : 0;
+      const score = hintBonus + sum;
+      if (score > bestScore) { bestScore = score; best = h; }
+    });
+    return best;
+  }
+
+  // ---- Anomaly detection (IQR) ----
+  function computeAnomalies(){
+    state.anomalyIds = new Set(); state.anomalyBounds = null;
+    if (!state.amountCol) return;
+    const nums = state.rows.map(r=>parseNumberValue(r[state.amountCol])).filter(v=>v!==null).sort((a,b)=>a-b);
+    if (nums.length < 8) return;
+    const q = (p)=>{ const idx=(nums.length-1)*p; const lo=Math.floor(idx), hi=Math.ceil(idx); return nums[lo] + (nums[hi]-nums[lo])*(idx-lo); };
+    const q1=q(0.25), q3=q(0.75), iqr=q3-q1;
+    const lower=q1-1.5*iqr, upper=q3+1.5*iqr;
+    state.anomalyBounds = {lower, upper};
+    state.rows.forEach((r, idx)=>{ const v = parseNumberValue(r[state.amountCol]); if (v!==null && (v<lower||v>upper)) state.anomalyIds.add(idx); });
+  }
+  function rowIndexKey(row){ return state.rows.indexOf(row); }
+
+  function setStatus(text){ $("#statusPill").innerHTML = '<span class="status-dot"></span>' + text; }
+  function showError(msg){ const el=$("#errorMsg"); el.textContent=msg; el.style.display="block"; $("#loadingMsg").style.display="none"; }
+  function hideMsgs(){ $("#errorMsg").style.display="none"; $("#loadingMsg").style.display="none"; }
+
+  function loadData(url){
+    $("#loadingMsg").style.display = "block"; $("#errorMsg").style.display = "none";
+    setStatus("กำลังโหลด…");
+    Papa.parse(url, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: function(results){
+        if (!results.data || results.data.length === 0) { showError("โหลดสำเร็จแต่ไม่พบข้อมูลในชีท ตรวจสอบว่าแท็บที่ Publish to web ถูกต้องหรือไม่"); return; }
+        const headers = results.meta.fields.filter(h => h && h.trim() !== "");
+        state.headers = headers; state.rows = results.data;
+        state.dimHeaders = DIMENSION_COLUMNS.map(w => resolveColumnName(w, headers)).filter(h => h !== null);
+        const dimSet = new Set(state.dimHeaders);
+        state.amountCol = pickAmountColumn(headers, state.rows, dimSet);
+        state.yearCol = resolveColumnName("Year", headers);
+        state.monthCol = resolveColumnName("Month", headers);
+        computeAnomalies();
+        state.filters = {}; state.page = 1; state.showAnomalyOnly = false; state.drill = null;
+        state.activeDimension = resolveColumnName("Main Category", headers) && state.dimHeaders.includes(resolveColumnName("Main Category", headers))
+          ? resolveColumnName("Main Category", headers) : state.dimHeaders[0];
+        hideMsgs();
+        setStatus("อัปเดตล่าสุด <b>" + new Date().toLocaleTimeString("th-TH") + "</b> · " + state.rows.length.toLocaleString("th-TH") + " แถว");
+        buildUI();
+      },
+      error: function(err){
+        showError("ดึงข้อมูลไม่สำเร็จ: " + (err && err.message ? err.message : "ไม่ทราบสาเหตุ") + " — ตรวจสอบว่าลิงก์เป็น Publish to web แบบ CSV และเปิดสิทธิ์การเข้าถึงแบบสาธารณะแล้ว");
+      }
+    });
+  }
+
+  function leadingNumber(s){
+    const m = String(s).trim().match(/^-?\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+  function getValueCounts(rows, h){
+    const counts = {};
+    rows.forEach(r=>{ const v = String(r[h]||"").trim(); if (v) counts[v]=(counts[v]||0)+1; });
+    let entries = Object.entries(counts);
+    const allLeadNum = entries.length>0 && entries.every(([k])=> leadingNumber(k) !== null);
+    if (allLeadNum && entries.length <= 40) entries.sort((a,b)=> leadingNumber(a[0]) - leadingNumber(b[0]));
+    else entries.sort((a,b)=>b[1]-a[1]);
+    return entries;
+  }
+
+  function applyFilters(){
+    let rows = state.rows;
+    state.dimHeaders.forEach(h=>{
+      const f = state.filters[h]; if (!f) return;
+      const total = getValueCounts(state.rows, h).length;
+      if (f.selected && f.selected.size > 0 && f.selected.size < total) rows = rows.filter(r => f.selected.has(String(r[h]||"").trim()));
+    });
+    if (state.showAnomalyOnly) rows = rows.filter(r => state.anomalyIds.has(rowIndexKey(r)));
+    if (state.tableQuery.trim() !== "") {
+      const q = state.tableQuery.trim().toLowerCase();
+      rows = rows.filter(r => state.headers.some(h => String(r[h]||"").toLowerCase().includes(q)));
+    }
+    state.filteredRows = rows;
+  }
+
+  function buildUI(){ renderFilters(); renderDimTabs(); refreshAll(); }
+  function refreshAll(){
+    applyFilters(); renderSummary();
+    try { renderTrend(); } catch(e){ console.error("renderTrend failed:", e); }
+    try { renderBreakdown(); } catch(e){ console.error("renderBreakdown failed:", e); }
+    try { renderMonthlyDonut(); } catch(e){ console.error("renderMonthlyDonut failed:", e); }
+    state.page = 1;
+    try { renderTable(); } catch(e){ console.error("renderTable failed:", e); }
+    renderActiveChips();
+    updateFacetCounts();
+    $("#anomalyToggle").classList.toggle("on", state.showAnomalyOnly);
+  }
+
+  // Rows filtered by every active dimension filter EXCEPT the given column, plus search + anomaly toggle —
+  // this is what a filter panel's option counts should reflect ("real-time" faceted counts).
+  function rowsExcludingFilter(excludeCol){
+    let rows = state.rows;
+    state.dimHeaders.forEach(h=>{
+      if (h === excludeCol) return;
+      const f = state.filters[h]; if (!f) return;
+      const total = getValueCounts(state.rows, h).length;
+      if (f.selected && f.selected.size > 0 && f.selected.size < total) rows = rows.filter(r => f.selected.has(String(r[h]||"").trim()));
+    });
+    if (state.showAnomalyOnly) rows = rows.filter(r => state.anomalyIds.has(rowIndexKey(r)));
+    if (state.tableQuery.trim() !== "") {
+      const q = state.tableQuery.trim().toLowerCase();
+      rows = rows.filter(r => state.headers.some(h => String(r[h]||"").toLowerCase().includes(q)));
+    }
+    return rows;
+  }
+
+  function updateFacetCounts(){
+    state.dimHeaders.forEach(h=>{
+      const rows = rowsExcludingFilter(h);
+      const counts = {};
+      rows.forEach(r=>{ const v = String(r[h]||"").trim(); if (v) counts[v]=(counts[v]||0)+1; });
+      const panel = $(`.filter-panel[data-col="${CSS.escape(h)}"]`);
+      if (!panel) return;
+      $$(".opt-row", panel).forEach(row=>{
+        const val = row.dataset.value;
+        const n = counts[val] || 0;
+        const badge = row.querySelector(".facet-count");
+        if (badge) badge.textContent = n.toLocaleString("th-TH");
+        row.classList.toggle("zero", n === 0);
+      });
+    });
+  }
+
+  // ---------- Filters ----------
+  function renderFilters(){
+    const bar = $("#filterBar"); bar.innerHTML = "";
+    state.dimHeaders.forEach(h=>{
+      const valueCounts = getValueCounts(state.rows, h);
+      const wrap = document.createElement("div"); wrap.className = "filter-control";
+      const btn = document.createElement("button"); btn.className = "filter-btn";
+      btn.innerHTML = `<span>${h}</span><span class="arrow">▾</span>`;
+      wrap.appendChild(btn);
+      const panel = document.createElement("div"); panel.className = "filter-panel"; panel.dataset.col = h;
+      state.filters[h] = state.filters[h] || {selected: new Set(valueCounts.map(v=>v[0]))};
+
+      const search = document.createElement("input");
+      search.type = "text"; search.className = "search-mini"; search.placeholder = "ค้นหา…";
+      panel.appendChild(search);
+      const list = document.createElement("div"); list.className = "opt-list";
+      function renderOpts(filterText){
+        list.innerHTML = "";
+        valueCounts.forEach(([val,count])=>{
+          if (filterText && !val.toLowerCase().includes(filterText.toLowerCase())) return;
+          const row = document.createElement("div"); row.className = "opt-row"; row.dataset.value = val;
+          const id = "chk_"+h.replace(/\W/g,"")+"_"+val.replace(/\W/g,"");
+          row.innerHTML = `<input type="checkbox" id="${id}"><label for="${id}">${val}</label><span class="cnt-small mono facet-count">${count}</span>`;
+          const chk = row.querySelector("input");
+          chk.checked = state.filters[h].selected.has(val);
+          chk.addEventListener("change", ()=>{
+            if (chk.checked) state.filters[h].selected.add(val); else state.filters[h].selected.delete(val);
+            updateFilterBtnLabel(btn, h, valueCounts.length); refreshAll();
+          });
+          list.appendChild(row);
+        });
+      }
+      renderOpts(""); search.addEventListener("input", ()=>renderOpts(search.value));
+      panel.appendChild(list);
+      const actions = document.createElement("div"); actions.className = "panel-actions";
+      actions.innerHTML = `<button class="link-btn" data-act="all">เลือกทั้งหมด</button><button class="link-btn" data-act="none">ไม่เลือกเลย</button>`;
+      actions.querySelector('[data-act="all"]').addEventListener("click", ()=>{
+        state.filters[h].selected = new Set(valueCounts.map(v=>v[0])); renderOpts(search.value); updateFilterBtnLabel(btn,h,valueCounts.length); refreshAll();
+      });
+      actions.querySelector('[data-act="none"]').addEventListener("click", ()=>{
+        state.filters[h].selected = new Set(); renderOpts(search.value); updateFilterBtnLabel(btn,h,valueCounts.length); refreshAll();
+      });
+      panel.appendChild(actions);
+
+      btn.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        $$(".filter-panel.open").forEach(p=>{ if(p!==panel) p.classList.remove("open"); });
+        panel.classList.toggle("open");
+      });
+      wrap.appendChild(panel); bar.appendChild(wrap);
+      updateFilterBtnLabel(btn, h, valueCounts.length);
+    });
+
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "clear-all"; clearBtn.textContent = "✕ ล้างตัวกรองทั้งหมด";
+    clearBtn.addEventListener("click", ()=>{ state.filters = {}; state.showAnomalyOnly=false; state.drill=null; renderDrillChip(); renderFilters(); refreshAll(); });
+    bar.appendChild(clearBtn);
+
+    document.addEventListener("click", (e)=>{
+      if (!e.target.closest(".filter-control")) $$(".filter-panel.open").forEach(p=>p.classList.remove("open"));
+    });
+  }
+
+  function updateFilterBtnLabel(btn, h, totalCount){
+    const f = state.filters[h]; let badge = ""; let active=false;
+    if (f.selected.size < totalCount) { badge = f.selected.size; active=true; }
+    btn.classList.toggle("active", active);
+    btn.innerHTML = `<span>${h}</span>${badge!==""?`<span class="cnt">${badge}</span>`:""}<span class="arrow">▾</span>`;
+  }
+
+  function renderActiveChips(){
+    const wrap = $("#activeChips"); wrap.innerHTML = "";
+    state.dimHeaders.forEach(h=>{
+      const f = state.filters[h]; if (!f) return;
+      const total = getValueCounts(state.rows, h).length;
+      if (f.selected.size >= total) return;
+      const chip = document.createElement("div"); chip.className = "chip";
+      chip.innerHTML = `<span>${h}: ${f.selected.size} รายการ</span><button>✕</button>`;
+      chip.querySelector("button").addEventListener("click", ()=>{ delete state.filters[h]; renderFilters(); refreshAll(); });
+      wrap.appendChild(chip);
+    });
+    if (state.showAnomalyOnly) {
+      const chip = document.createElement("div"); chip.className = "chip";
+      chip.style.background = "var(--danger-soft)"; chip.style.color = "var(--danger)"; chip.style.borderColor = "var(--danger-border)";
+      chip.innerHTML = `<span>เฉพาะรายการผิดปกติ</span><button style="color:var(--danger)">✕</button>`;
+      chip.querySelector("button").addEventListener("click", ()=>{ state.showAnomalyOnly=false; refreshAll(); });
+      wrap.appendChild(chip);
+    }
+  }
+
+  // ---------- KPI ----------
+  function renderSummary(){
+    const grid = $("#summaryGrid"); grid.innerHTML = "";
+    const rows = state.filteredRows; const cards = [];
+    cards.push({label:"จำนวนรายการ", value: fmtNum(rows.length,0), color:"cyan", sub: rows.length!==state.rows.length ? `จากทั้งหมด ${state.rows.length.toLocaleString("th-TH")} รายการ` : "ทั้งหมด"});
+    if (state.amountCol) {
+      const nums = rows.map(r=>parseNumberValue(r[state.amountCol])).filter(v=>v!==null);
+      const sum = nums.reduce((a,b)=>a+b,0); const avg = nums.length? sum/nums.length : 0;
+      cards.push({label:"ยอดรวม (" + state.amountCol + ")", value: fmtBaht(sum), color:"violet"});
+      cards.push({label:"ค่าเฉลี่ยต่อรายการ", value: fmtBaht(avg), color:"emerald"});
+      if (nums.length) cards.push({label:"สูงสุด / ต่ำสุด", value: fmtNum(Math.max(...nums),0) + " / " + fmtNum(Math.min(...nums),0), color:"amber"});
+      if (state.anomalyBounds) {
+        const anomalyCount = rows.filter(r=>state.anomalyIds.has(rowIndexKey(r))).length;
+        cards.push({label:"รายการผิดปกติ", value: fmtNum(anomalyCount,0), warn:true, color:"pink", sub:"คลิกเพื่อดูเฉพาะรายการนี้"});
+      }
+    }
+    cards.forEach(c=>{
+      const el = document.createElement("div");
+      el.className = "stat-card c-" + c.color + (c.warn?" warn":"") + (c.warn && state.showAnomalyOnly ? " on":"");
+      el.innerHTML = `<div class="label">${c.label}</div><div class="value">${c.value}</div>${c.sub?`<div class="sub">${c.sub}</div>`:""}`;
+      if (c.warn) el.addEventListener("click", ()=>{ state.showAnomalyOnly = !state.showAnomalyOnly; refreshAll(); });
+      grid.appendChild(el);
+    });
+  }
+
+  // ---------- Trend (Year + Month) ----------
+  const MONTH_ABBR_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTH_ABBR_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  function monthIndexOf(raw){
+    const s = String(raw).trim();
+    if (!s) return null;
+    const enMatch = s.match(/[A-Za-z]{3,}/);
+    if (enMatch) {
+      const idx = MONTH_ABBR_EN.findIndex(ab => ab.toLowerCase() === enMatch[0].slice(0,3).toLowerCase());
+      if (idx !== -1) return idx;
+    }
+    const thIdx = MONTH_ABBR_TH.findIndex(ab => s.includes(ab.replace(/\./g,"")) || s.includes(ab));
+    if (thIdx !== -1) return thIdx;
+    const numMatch = s.match(/^-?\d+/);
+    if (numMatch) { const v = parseInt(numMatch[0],10); if (v>=1 && v<=12) return v-1; }
+    return null;
+  }
+
+  function renderTrend(){
+    const section = $("#trendSection");
+    if (!state.yearCol || !state.monthCol || !state.amountCol) { section.style.display = "none"; return; }
+    section.style.display = "";
+    const rows = state.filteredRows;
+    const byYear = {};
+    rows.forEach(r=>{
+      const y = String(r[state.yearCol]||"").trim();
+      const mi = monthIndexOf(r[state.monthCol]);
+      if (!y || mi === null) return;
+      if (!byYear[y]) byYear[y] = Array(12).fill(0);
+      byYear[y][mi] += parseNumberValue(r[state.amountCol]) || 0;
+    });
+    const years = Object.keys(byYear).sort();
+    const palette = chartColors();
+    const datasets = years.map((y,i)=>({
+      label: y, data: byYear[y], backgroundColor: palette[i % palette.length], borderRadius:5, maxBarThickness:24
+    }));
+    const ctx = $("#trendChart").getContext("2d");
+    if (state.trendChart) state.trendChart.destroy();
+    state.trendChart = new Chart(ctx, {
+      type:"bar",
+      data:{ labels: MONTH_ABBR_EN, datasets },
+      options:{ responsive:true, maintainAspectRatio:false,
+        onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
+        onClick:(evt, els)=>{
+          if (!els.length) return;
+          const el = els[0]; const mi = el.index; const year = years[el.datasetIndex];
+          const monthName = MONTH_ABBR_EN[mi];
+          setDrill(`${state.yearCol} = ${year}, ${state.monthCol} = ${monthName}`,
+            row => String(row[state.yearCol]||"").trim() === year && monthIndexOf(row[state.monthCol]) === mi,
+            `trend::${year}::${mi}`);
+        },
+        plugins:{
+          legend:{ display: years.length>1, position:"top", align:"end",
+            labels:{ color:"rgba(245,246,252,.82)", font:{family:"IBM Plex Sans Thai", size:11}, boxWidth:11, padding:10 } },
+          tooltip:{callbacks:{label:(c)=> " " + c.dataset.label + ": " + fmtBaht(c.parsed.y)}} },
+        scales:{
+          x:{ grid:{display:false}, ticks:{font:{family:"IBM Plex Sans Thai", size:11}, color:"rgba(245,246,252,.7)"} },
+          y:{ ticks:{font:{family:"IBM Plex Mono", size:10}, color:"rgba(245,246,252,.62)"}, grid:{color:"rgba(255,255,255,.08)"} }
+        } }
+    });
+  }
+
+  function renderMonthlyDonut(){
+    const canvasEl = $("#breakdownDonutChart");
+    if (!canvasEl) return;
+    if (!state.monthCol || !state.amountCol) return;
+    const rows = state.filteredRows;
+    const totals = Array(12).fill(0);
+    rows.forEach(r=>{
+      const mi = monthIndexOf(r[state.monthCol]);
+      if (mi === null) return;
+      totals[mi] += parseNumberValue(r[state.amountCol]) || 0;
+    });
+    const labels = [], data = [];
+    MONTH_ABBR_EN.forEach((name,i)=>{ if (totals[i] !== 0) { labels.push(name); data.push(totals[i]); } });
+    drawBreakdownDonut(labels.length? labels : MONTH_ABBR_EN, labels.length? data : Array(12).fill(0));
+  }
+
+  // ---------- Breakdown by dimension ----------
+  function renderDimTabs(){
+    const wrap = $("#dimTabs"); wrap.innerHTML = "";
+    state.dimHeaders.forEach(h=>{
+      const tab = document.createElement("button"); tab.className = "dim-tab" + (h===state.activeDimension?" active":"");
+      tab.textContent = h;
+      tab.addEventListener("click", ()=>{ state.activeDimension = h; renderDimTabs(); renderBreakdown(); });
+      wrap.appendChild(tab);
+    });
+  }
+
+  function chartColors(){ return ["#8B7CF6","#38DBEA","#FFC069","#FF6FA0","#3DDC97","#5B9DFF","#FF7A59","#B98AF0"]; }
+
+  function computeBreakdown(rows, col){
+    const map = {};
+    rows.forEach(r=>{
+      const key = String(r[col]||"").trim() || "ไม่ระบุ";
+      const v = state.amountCol ? (parseNumberValue(r[state.amountCol]) || 0) : 0;
+      if (!map[key]) map[key] = {value:key, total:0, count:0};
+      map[key].total += v; map[key].count += 1;
+    });
+    const grandTotal = Object.values(map).reduce((a,e)=>a+e.total,0);
+    const arr = Object.values(map).map(e=>({...e, avg: e.count? e.total/e.count : 0, pct: grandTotal? e.total/grandTotal*100 : 0}));
+    return arr;
+  }
+
+  function renderBreakdown(){
+    const col = state.activeDimension;
+    if (!col) return;
+    const rows = state.filteredRows;
+    const breakdown = computeBreakdown(rows, col).sort((a,b)=>b.total-a.total);
+
+    $("#breakdownBarTitle").textContent = "ยอดรวมแยกตาม " + col;
+
+    const topN = 10;
+    let barLabels, barData;
+    if (breakdown.length > topN) {
+      const top = breakdown.slice(0,topN); const restSum = breakdown.slice(topN).reduce((a,e)=>a+e.total,0);
+      barLabels = top.map(e=>e.value).concat(["อื่นๆ"]); barData = top.map(e=>e.total).concat([restSum]);
+    } else { barLabels = breakdown.map(e=>e.value); barData = breakdown.map(e=>e.total); }
+
+    drawBreakdownBar(barLabels, barData, col, breakdown.length > topN ? barLabels.slice(0,-1) : null);
+    renderBreakdownTable(breakdown, col);
+  }
+
+  function drawBreakdownBar(labels, data, col, otherExcludeList){
+    const ctx = $("#breakdownBarChart").getContext("2d");
+    if (state.breakdownBarChart) state.breakdownBarChart.destroy();
+    state.breakdownBarChart = new Chart(ctx, {
+      type:"bar",
+      data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderRadius:4 }] },
+      options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
+        onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
+        onClick:(evt, els)=>{
+          if (!els.length) return;
+          const label = labels[els[0].index];
+          if (label === "อื่นๆ" && otherExcludeList) {
+            setDrill(`${col} ไม่ใช่ Top ${otherExcludeList.length}`,
+              row => !otherExcludeList.includes(String(row[col]||"").trim() || "ไม่ระบุ"),
+              `other::${col}`);
+          } else {
+            setDrill(`${col} = ${label}`, row => (String(row[col]||"").trim() || "ไม่ระบุ") === label, `${col}::${label}`);
+          }
+        },
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(c)=> " " + fmtBaht(c.parsed.x)}} },
+        scales:{
+          x:{ ticks:{font:{family:"IBM Plex Mono", size:10}, color:"rgba(245,246,252,.62)"}, grid:{color:"rgba(255,255,255,.08)"} },
+          y:{ grid:{display:false}, ticks:{font:{family:"IBM Plex Sans Thai", size:11}, color:"rgba(245,246,252,.82)"} }
+        } }
+    });
+  }
+  function drawBreakdownDonut(labels, data){
+    const ctx = $("#breakdownDonutChart").getContext("2d");
+    if (state.breakdownDonutChart) state.breakdownDonutChart.destroy();
+    const total = data.reduce((a,b)=>a+b,0);
+    state.breakdownDonutChart = new Chart(ctx, {
+      type:"doughnut",
+      data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderColor:"rgba(11,14,30,.85)", borderWidth:2 }] },
+      options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
+        onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
+        onClick:(evt, els)=>{
+          if (!els.length || !state.monthCol) return;
+          const idx = els[0].index; const monthName = labels[idx];
+          const mi = MONTH_ABBR_EN.indexOf(monthName);
+          if (mi === -1) return;
+          setDrill(`${state.monthCol} = ${monthName}`, row => monthIndexOf(row[state.monthCol]) === mi, `monthOnly::${mi}`);
+        },
+        plugins:{
+          legend:{ position:"right", labels:{ color:"rgba(245,246,252,.82)", font:{family:"IBM Plex Sans Thai", size:11}, boxWidth:11, padding:9 } },
+          tooltip:{ callbacks:{ label:(c)=>{ const pct= total? Math.round(c.parsed/total*100):0; return " " + c.label + ": " + fmtBaht(c.parsed) + " (" + pct + "%)"; } } }
+        } }
+    });
+  }
+
+  function renderBreakdownTable(breakdown, col){
+    const head = $("#breakdownHeadRow");
+    const cols = [ {k:"value", label:col}, {k:"total", label:"ยอดรวม"}, {k:"pct", label:"% ของยอดรวม"}, {k:"count", label:"จำนวนรายการ"}, {k:"avg", label:"เฉลี่ย/รายการ"} ];
+    head.innerHTML = "";
+    cols.forEach(c=>{
+      const th = document.createElement("th");
+      if (c.k !== "value") th.className = "num";
+      let arrow = ""; if (state.breakdownSortCol===c.k) arrow = `<span class="sort-arrow">${state.breakdownSortDir===1?"▲":"▼"}</span>`;
+      th.innerHTML = c.label + arrow;
+      th.addEventListener("click", ()=>{
+        if (state.breakdownSortCol===c.k) state.breakdownSortDir *= -1; else { state.breakdownSortCol=c.k; state.breakdownSortDir = c.k==="value"?1:-1; }
+        renderBreakdown();
+      });
+      head.appendChild(th);
+    });
+    const sorted = breakdown.slice().sort((a,b)=>{
+      let va=a[state.breakdownSortCol], vb=b[state.breakdownSortCol];
+      if (typeof va === "string") { va=va.toLowerCase(); vb=vb.toLowerCase(); }
+      if (va<vb) return -1*state.breakdownSortDir; if (va>vb) return 1*state.breakdownSortDir; return 0;
+    });
+    const maxTotal = Math.max(...breakdown.map(e=>Math.abs(e.total)), 1);
+    const body = $("#breakdownBody"); body.innerHTML = "";
+    if (sorted.length === 0) { body.innerHTML = `<tr class="empty-row"><td colspan="5">ไม่พบข้อมูล</td></tr>`; return; }
+    sorted.forEach(e=>{
+      const tr = document.createElement("tr");
+      tr.classList.add("clickable-row");
+      const pctWidth = Math.min(100, Math.abs(e.total)/maxTotal*100);
+      tr.innerHTML = `
+        <td>${e.value}</td>
+        <td class="num">${fmtBaht(e.total)}</td>
+        <td class="num"><div class="mini-bar-cell"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pctWidth}%;"></div></div><span>${e.pct.toFixed(1)}%</span></div></td>
+        <td class="num">${fmtNum(e.count,0)}</td>
+        <td class="num">${fmtBaht(e.avg)}</td>`;
+      tr.addEventListener("click", ()=>{
+        setDrill(`${col} = ${e.value}`, row => (String(row[col]||"").trim() || "ไม่ระบุ") === e.value, `${col}::${e.value}`);
+      });
+      body.appendChild(tr);
+    });
+  }
+
+  // ---------- Raw data table ----------
+  // ---------- Drill-down (click a chart bar / table row to filter Raw Data) ----------
+  function setDrill(label, predicate, key){
+    if (state.drill && state.drill.key === key) { state.drill = null; }
+    else { state.drill = { label, predicate, key }; }
+    state.page = 1;
+    renderDrillChip();
+    renderTable();
+    const section = document.getElementById("rawDataSection");
+    if (section) section.scrollIntoView({ behavior:"smooth", block:"start" });
+  }
+  function clearDrill(){ state.drill = null; renderDrillChip(); renderTable(); }
+  function renderDrillChip(){
+    const wrap = $("#drillChipWrap"); if (!wrap) return;
+    wrap.innerHTML = "";
+    if (!state.drill) return;
+    const chip = document.createElement("div"); chip.className = "chip";
+    chip.innerHTML = `<span>กำลังดูเฉพาะ: ${state.drill.label}</span><button>✕</button>`;
+    chip.querySelector("button").addEventListener("click", clearDrill);
+    wrap.appendChild(chip);
+  }
+
+  function renderTable(){
+    const headRow = $("#tableHeadRow"); headRow.innerHTML = "";
+    state.headers.forEach(h=>{
+      const th = document.createElement("th");
+      if (h === state.amountCol) th.className = "num";
+      let arrow = ""; if (state.sortCol === h) arrow = `<span class="sort-arrow">${state.sortDir===1?"▲":"▼"}</span>`;
+      th.innerHTML = h + arrow;
+      th.addEventListener("click", ()=>{ if (state.sortCol === h) state.sortDir *= -1; else { state.sortCol = h; state.sortDir = 1; } renderTable(); });
+      headRow.appendChild(th);
+    });
+    let rows = state.filteredRows.slice();
+    if (state.drill) rows = rows.filter(state.drill.predicate);
+    if (state.sortCol) {
+      const isAmount = state.sortCol === state.amountCol;
+      rows.sort((a,b)=>{
+        let va = a[state.sortCol], vb = b[state.sortCol];
+        if (isAmount) { va = parseNumberValue(va) ?? -Infinity; vb = parseNumberValue(vb) ?? -Infinity; }
+        else {
+          const na = parseNumberValue(va), nb = parseNumberValue(vb);
+          if (na !== null && nb !== null) { va = na; vb = nb; }
+          else { va = String(va||"").toLowerCase(); vb = String(vb||"").toLowerCase(); }
+        }
+        if (va < vb) return -1*state.sortDir; if (va > vb) return 1*state.sortDir; return 0;
+      });
+    }
+    const body = $("#tableBody"); body.innerHTML = "";
+    if (rows.length === 0) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="${state.headers.length}">ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
+    } else {
+      const frag = document.createDocumentFragment();
+      rows.forEach(r=>{
+        const tr = document.createElement("tr");
+        const isAnomaly = state.anomalyIds.has(rowIndexKey(r));
+        if (isAnomaly) tr.classList.add("anomaly-row");
+        state.headers.forEach((h, i)=>{
+          const td = document.createElement("td");
+          if (h === state.amountCol) td.className = "num";
+          let val = r[h] !== undefined && r[h] !== null ? r[h] : "";
+          if (i === 0 && isAnomaly) td.innerHTML = `<span class="anomaly-dot" title="ค่าผิดปกติ"></span>${val}`;
+          else td.textContent = val;
+          tr.appendChild(td);
+        });
+        frag.appendChild(tr);
+      });
+      body.appendChild(frag);
+    }
+    $("#rowCountLabel").textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
+  }
+
+  $("#refreshBtn").addEventListener("click", ()=> loadData($("#csvUrlInput").value.trim()));
+  $("#loadUrlBtn").addEventListener("click", ()=> loadData($("#csvUrlInput").value.trim()));
+  $("#settingsBtn").addEventListener("click", (e)=>{ e.stopPropagation(); $("#settingsPanel").classList.toggle("open"); });
+  document.addEventListener("click", (e)=>{ if (!$("#settingsPanel").contains(e.target) && e.target.id !== "settingsBtn") $("#settingsPanel").classList.remove("open"); });
+  $("#autoRefreshChk").addEventListener("change", (e)=>{
+    if (e.target.checked) state.autoRefreshTimer = setInterval(()=> loadData($("#csvUrlInput").value.trim()), 60000);
+    else if (state.autoRefreshTimer) clearInterval(state.autoRefreshTimer);
+  });
+  $("#tableSearch").addEventListener("input", (e)=>{ state.tableQuery = e.target.value; applyFilters(); renderTable(); });
+  $("#anomalyToggle").addEventListener("click", ()=>{ state.showAnomalyOnly = !state.showAnomalyOnly; refreshAll(); });
+
+  // ---------- Section nav (smooth scroll + scrollspy) ----------
+  const navLinks = $$(".nav-link");
+  navLinks.forEach(link=>{
+    link.addEventListener("click", ()=>{
+      const target = document.getElementById(link.dataset.target);
+      if (target) target.scrollIntoView({ behavior:"smooth", block:"start" });
+    });
+  });
+  const navSections = navLinks.map(l=>document.getElementById(l.dataset.target)).filter(Boolean);
+  if ("IntersectionObserver" in window && navSections.length) {
+    const spy = new IntersectionObserver((entries)=>{
+      entries.forEach(entry=>{
+        if (!entry.isIntersecting) return;
+        const id = entry.target.id;
+        navLinks.forEach(l=> l.classList.toggle("active", l.dataset.target === id));
+      });
+    }, { rootMargin: "-110px 0px -70% 0px", threshold: 0 });
+    navSections.forEach(sec=> spy.observe(sec));
+  }
+
+  loadData($("#csvUrlInput").value.trim());
+})();
+</script>
+</body>
+</html>
