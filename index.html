@@ -588,10 +588,19 @@
       const nums = rows.map(r=>parseNumberValue(r[state.amountCol])).filter(v=>v!==null);
       const sum = nums.reduce((a,b)=>a+b,0);
       cards.push({label:"ยอดรวม (" + state.amountCol + ")", value: fmtBaht(sum), color:"violet"});
-      let avgPerMonth = null;
-      const nMonths = distinctMonthCount(rows);
-      if (nMonths !== null) avgPerMonth = nMonths ? sum / nMonths : 0;
-      cards.push({label:"ค่าเฉลี่ยต่อเดือน", value: avgPerMonth !== null ? fmtBaht(avgPerMonth) : "–", color:"emerald"});
+
+      if (state.yearCol && state.monthCol) {
+        const years = Array.from(new Set(rows.map(r=>String(r[state.yearCol]||"").trim()).filter(Boolean))).sort();
+        years.forEach(y=>{
+          const yearRows = rows.filter(r=> String(r[state.yearCol]||"").trim() === y);
+          const yearSum = yearRows.map(r=>parseNumberValue(r[state.amountCol])).filter(v=>v!==null).reduce((a,b)=>a+b,0);
+          const nMonths = distinctMonthCount(yearRows);
+          const avg = nMonths ? yearSum / nMonths : 0;
+          cards.push({label:`ค่าเฉลี่ยต่อเดือน (${y})`, value: fmtBaht(avg), color:"emerald"});
+        });
+      } else {
+        cards.push({label:"ค่าเฉลี่ยต่อเดือน", value: "–", color:"emerald"});
+      }
     }
     cards.forEach(c=>{
       const el = document.createElement("div");
