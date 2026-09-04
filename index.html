@@ -242,9 +242,9 @@
   <div class="section-nav-inner">
     <button class="nav-link" data-target="kpiSection">สรุปภาพรวม</button>
     <button class="nav-link" data-target="trendSection">แนวโน้มรายเดือน</button>
-    <button class="nav-link" data-target="breakdownSection">แยกตามมิติ</button>
     <button class="nav-link" data-target="productSection">วิเคราะห์ Product</button>
     <button class="nav-link" data-target="categorySection">วิเคราะห์หมวดหมู่</button>
+    <button class="nav-link" data-target="breakdownSection">แยกตามมิติ</button>
     <button class="nav-link" data-target="rawDataSection">Raw Data</button>
   </div>
 </nav>
@@ -266,21 +266,6 @@
     <div class="trend-card"><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
   </section>
 
-  <section id="breakdownSection">
-    <div class="section-title">แยกตามมิติ — เลือกดูได้ทุกมุม</div>
-    <div class="dim-tabs" id="dimTabs"></div>
-    <div class="breakdown-grid">
-      <div class="chart-card"><h3 id="breakdownBarTitle">ยอดรวม</h3><div class="chart-wrap"><canvas id="breakdownBarChart"></canvas></div></div>
-      <div class="chart-card"><h3>สัดส่วนตามเดือน</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr id="breakdownHeadRow"></tr></thead>
-        <tbody id="breakdownBody"></tbody>
-      </table>
-    </div>
-  </section>
-
   <section id="productSection">
     <div class="section-title">วิเคราะห์ราย Product</div>
     <div class="focus-hint">คลิกแท่ง Product เพื่อดู Team และแนวโน้มรายเดือนเฉพาะสินค้านั้น — คลิกซ้ำเพื่อยกเลิก</div>
@@ -299,6 +284,21 @@
     <div class="linked-grid-2">
       <div class="chart-card"><h3>ยอดรวมตาม Main Category</h3><div class="chart-wrap"><canvas id="mainCatChart"></canvas></div></div>
       <div class="chart-card"><h3 id="subCatTitle">ยอดรวมตาม Sub Category</h3><div class="chart-wrap"><canvas id="subCatChart"></canvas></div></div>
+    </div>
+  </section>
+
+  <section id="breakdownSection">
+    <div class="section-title">แยกตามมิติ — เลือกดูได้ทุกมุม</div>
+    <div class="dim-tabs" id="dimTabs"></div>
+    <div class="breakdown-grid">
+      <div class="chart-card"><h3 id="breakdownBarTitle">ยอดรวม</h3><div class="chart-wrap"><canvas id="breakdownBarChart"></canvas></div></div>
+      <div class="chart-card"><h3>สัดส่วนตามเดือน</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="breakdownHeadRow"></tr></thead>
+        <tbody id="breakdownBody"></tbody>
+      </table>
     </div>
   </section>
 
