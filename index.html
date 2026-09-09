@@ -713,6 +713,30 @@
 
   function chartColors(){ return ["#8B7CF6","#38DBEA","#FFC069","#FF6FA0","#3DDC97","#5B9DFF","#FF7A59","#B98AF0"]; }
 
+  // Draws a rounded "N%" label next to (horizontal) or above (vertical) each bar, share of that chart's own total.
+  function percentLabelPlugin(horizontal){
+    return {
+      id: "pctLabels",
+      afterDatasetsDraw(chart){
+        const dataArr = chart.data.datasets[0].data;
+        const total = dataArr.reduce((a,b)=>a+Math.abs(b),0) || 1;
+        const meta = chart.getDatasetMeta(0);
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.font = "600 10.5px 'IBM Plex Mono', monospace";
+        ctx.fillStyle = "rgba(245,246,252,.9)";
+        meta.data.forEach((bar, i)=>{
+          const val = dataArr[i]; if (val === undefined || val === null) return;
+          const pct = Math.round(Math.abs(val)/total*100);
+          const pos = bar.tooltipPosition();
+          if (horizontal) { ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(pct + "%", pos.x + 6, pos.y); }
+          else { ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(pct + "%", pos.x, pos.y - 4); }
+        });
+        ctx.restore();
+      }
+    };
+  }
+
   // Generic single-series bar chart used by the linked Product / Category widgets.
   // opts: { horizontal (default true), color, focus (highlight this label, dim the rest), onClick(label) }
   function drawSimpleBar(canvasId, labels, data, opts){
@@ -726,7 +750,9 @@
     const chart = new Chart(ctx, {
       type:"bar",
       data:{ labels, datasets:[{ data, backgroundColor: colors, borderRadius:4 }] },
+      plugins:[percentLabelPlugin(horizontal)],
       options:{ indexAxis: horizontal ? "y" : "x", responsive:true, maintainAspectRatio:false,
+        layout: horizontal ? { padding:{ right:34 } } : { padding:{ top:18 } },
         interaction:{ mode:"nearest", axis: horizontal ? "y" : "x", intersect:false },
         onHover:(evt, els)=>{ evt.native.target.style.cursor = (opts.onClick && els.length) ? "pointer" : "default"; },
         onClick: opts.onClick ? (evt, els)=>{ if (!els.length) return; opts.onClick(labels[els[0].index]); } : undefined,
@@ -878,7 +904,9 @@
     state.breakdownBarChart = new Chart(ctx, {
       type:"bar",
       data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderRadius:4 }] },
+      plugins:[percentLabelPlugin(true)],
       options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
+        layout:{ padding:{ right:34 } },
         interaction:{ mode:"nearest", axis:"y", intersect:false },
         onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
         onClick:(evt, els)=>{
@@ -952,7 +980,7 @@
       tr.innerHTML = `
         <td>${e.value}</td>
         <td class="num">${fmtBaht(e.total)}</td>
-        <td class="num"><div class="mini-bar-cell"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pctWidth}%;"></div></div><span>${e.pct.toFixed(1)}%</span></div></td>
+        <td class="num"><div class="mini-bar-cell"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pctWidth}%;"></div></div><span>${Math.round(e.pct)}%</span></div></td>
         <td class="num">${fmtNum(e.count,0)}</td>
         <td class="num">${fmtBaht(e.avg)}</td>`;
       tr.addEventListener("click", ()=>{
