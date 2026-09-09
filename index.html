@@ -151,8 +151,10 @@
   .stat-card.warn.on{background:var(--danger-soft);}
 
   /* Trend */
+  .trend-grid{display:grid; grid-template-columns:1.5fr 1fr; gap:14px;}
+  @media (max-width:900px){.trend-grid{grid-template-columns:1fr;}}
   .trend-card{ background:var(--glass); backdrop-filter:var(--blur); border:1px solid var(--glass-border); border-radius:var(--radius); padding:18px;}
-  .trend-card .chart-wrap{height:220px; position:relative;}
+  .trend-card .chart-wrap{height:280px; position:relative;}
 
   /* Dimension tabs */
   .dim-tabs{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px;}
@@ -256,7 +258,10 @@
 
   <section id="trendSection">
     <div class="section-title">แนวโน้มรายเดือน</div>
-    <div class="trend-card"><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
+    <div class="trend-grid">
+      <div class="trend-card"><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
+      <div class="chart-card"><h3 id="productCategoryTitle">สัดส่วนตาม Product</h3><div class="chart-wrap"><canvas id="productCategoryDonut"></canvas></div></div>
+    </div>
   </section>
 
   <section id="productSection">
@@ -454,6 +459,7 @@
     try { renderTrend(); } catch(e){ console.error("renderTrend failed:", e); }
     try { renderBreakdown(); } catch(e){ console.error("renderBreakdown failed:", e); }
     try { renderMonthlyDonut(); } catch(e){ console.error("renderMonthlyDonut failed:", e); }
+    try { renderProductCategoryDonut(); } catch(e){ console.error("renderProductCategoryDonut failed:", e); }
     try { renderProductAnalysis(); renderProductFocusChip(); } catch(e){ console.error("renderProductAnalysis failed:", e); }
     try { renderCategoryAnalysis(); renderCategoryFocusChip(); } catch(e){ console.error("renderCategoryAnalysis failed:", e); }
     state.page = 1;
@@ -704,6 +710,49 @@
     drawBreakdownDonut(labels.length? labels : MONTH_ABBR_EN, labels.length? data : Array(12).fill(0));
   }
 
+  // Fixed classification of the Product column into 4 report buckets.
+  function classifyProduct(rawValue){
+    const v = String(rawValue||"").toLowerCase();
+    if (v.includes("iux")) return "IUX";
+    if (v.includes("bd")) return "BD";
+    if (v.includes("salary") || v.includes("เงินเดือน")) return "Salary";
+    return "Other";
+  }
+  const PRODUCT_CATEGORY_ORDER = ["IUX","BD","Salary","Other"];
+  const PRODUCT_CATEGORY_COLORS = ["#8B7CF6","#38DBEA","#FFC069","#5B9DFF"];
+
+  function renderProductCategoryDonut(){
+    const canvasEl = $("#productCategoryDonut");
+    if (!canvasEl) return;
+    const section = $("#trendSection");
+    if (!state.productCol || !state.amountCol) { if (section) canvasEl.closest(".chart-card").style.display = "none"; return; }
+    if (section) canvasEl.closest(".chart-card").style.display = "";
+    const rows = state.filteredRows;
+    const totals = {IUX:0, BD:0, Salary:0, Other:0};
+    rows.forEach(r=>{
+      const bucket = classifyProduct(r[state.productCol]);
+      totals[bucket] += parseNumberValue(r[state.amountCol]) || 0;
+    });
+    const divisor = monthDivisor(rows);
+    $("#productCategoryTitle").textContent = divisor ? "ค่าเฉลี่ยต่อเดือนตาม Product" : "สัดส่วนตาม Product";
+    const data = PRODUCT_CATEGORY_ORDER.map(k => divisor ? totals[k]/divisor : totals[k]);
+
+    const ctx = canvasEl.getContext("2d");
+    if (state.chartInstances["productCategoryDonut"]) state.chartInstances["productCategoryDonut"].destroy();
+    const total = data.reduce((a,b)=>a+b,0);
+    const chart = new Chart(ctx, {
+      type:"doughnut",
+      data:{ labels: PRODUCT_CATEGORY_ORDER, datasets:[{ data, backgroundColor: PRODUCT_CATEGORY_COLORS, borderColor:"rgba(11,14,30,.85)", borderWidth:2 }] },
+      plugins:[donutPercentPlugin()],
+      options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
+        plugins:{
+          legend:{ position:"right", labels:{ color:"rgba(245,246,252,.82)", font:{family:"IBM Plex Sans Thai", size:11}, boxWidth:11, padding:9 } },
+          tooltip:{ callbacks:{ label:(c)=>{ const pct = total ? Math.round(c.parsed/total*100) : 0; return " " + c.label + ": " + fmtBaht(c.parsed) + " (" + pct + "%)"; } } }
+        } }
+    });
+    state.chartInstances["productCategoryDonut"] = chart;
+  }
+
   // ---------- Breakdown by dimension ----------
   function renderDimTabs(){
     const wrap = $("#dimTabs"); wrap.innerHTML = "";
@@ -940,6 +989,31 @@
         } }
     });
   }
+  function donutPercentPlugin(){
+    return {
+      id: "donutPct",
+      afterDatasetsDraw(chart){
+        const dataArr = chart.data.datasets[0].data;
+        const total = dataArr.reduce((a,b)=>a+Math.abs(b),0) || 1;
+        const meta = chart.getDatasetMeta(0);
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.font = "600 11px 'IBM Plex Mono', monospace";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        meta.data.forEach((arc,i)=>{
+          const val = dataArr[i]; if (!val) return;
+          const pct = Math.round(Math.abs(val)/total*100);
+          if (pct < 4) return;
+          const pos = arc.getCenterPoint ? arc.getCenterPoint() : arc.tooltipPosition();
+          const label = pct + "%";
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(11,14,30,.85)"; ctx.strokeText(label, pos.x, pos.y);
+          ctx.fillStyle = "#F5F6FC"; ctx.fillText(label, pos.x, pos.y);
+        });
+        ctx.restore();
+      }
+    };
+  }
+
   function drawBreakdownDonut(labels, data){
     const ctx = $("#breakdownDonutChart").getContext("2d");
     if (state.breakdownDonutChart) state.breakdownDonutChart.destroy();
@@ -947,6 +1021,7 @@
     state.breakdownDonutChart = new Chart(ctx, {
       type:"doughnut",
       data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderColor:"rgba(11,14,30,.85)", borderWidth:2 }] },
+      plugins:[donutPercentPlugin()],
       options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
         onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
         onClick:(evt, els)=>{
