@@ -264,7 +264,7 @@
     <div class="focus-hint">คลิกแท่ง Product เพื่อดู Team และแนวโน้มรายเดือนเฉพาะ Product นั้น — คลิกซ้ำเพื่อยกเลิก</div>
     <div class="linked-chips" id="productFocusChip"></div>
     <div class="linked-grid-3">
-      <div class="chart-card"><h3>ยอดรวมตาม Product</h3><div class="chart-wrap"><canvas id="productChart"></canvas></div></div>
+      <div class="chart-card"><h3 id="productChartTitle">ยอดรวมตาม Product</h3><div class="chart-wrap"><canvas id="productChart"></canvas></div></div>
       <div class="chart-card"><h3 id="productTeamTitle">แยกตาม Team</h3><div class="chart-wrap"><canvas id="productTeamChart"></canvas></div></div>
       <div class="chart-card"><h3 id="productMonthTitle">แนวโน้มรายเดือน</h3><div class="chart-wrap"><canvas id="productMonthChart"></canvas></div></div>
     </div>
@@ -275,7 +275,7 @@
     <div class="focus-hint">คลิกแท่ง Main Category เพื่อกรอง Sub Category ที่เกี่ยวข้อง — คลิกซ้ำเพื่อยกเลิก</div>
     <div class="linked-chips" id="categoryFocusChip"></div>
     <div class="linked-grid-2">
-      <div class="chart-card"><h3>ยอดรวมตาม Main Category</h3><div class="chart-wrap"><canvas id="mainCatChart"></canvas></div></div>
+      <div class="chart-card"><h3 id="mainCatTitle">ยอดรวมตาม Main Category</h3><div class="chart-wrap"><canvas id="mainCatChart"></canvas></div></div>
       <div class="chart-card"><h3 id="subCatTitle">ยอดรวมตาม Sub Category</h3><div class="chart-wrap"><canvas id="subCatChart"></canvas></div></div>
     </div>
   </section>
@@ -637,6 +637,10 @@
     });
     return set.size;
   }
+  function monthDivisor(rows){
+    const n = distinctMonthCount(rows);
+    return (n && n > 2) ? n : null;
+  }
 
   function renderTrend(){
     const section = $("#trendSection");
@@ -786,9 +790,11 @@
     section.style.display = "";
     const baseRows = state.filteredRows;
 
+    const productDivisor = monthDivisor(baseRows);
+    $("#productChartTitle").textContent = productDivisor ? "ค่าเฉลี่ยต่อเดือนตาม Product" : "ยอดรวมตาม Product";
     const productTop = topBreakdown(baseRows, state.productCol, 10);
     setChartWrapHeight("productChart", productTop.length);
-    drawSimpleBar("productChart", productTop.map(e=>e.value), productTop.map(e=>e.total), {
+    drawSimpleBar("productChart", productTop.map(e=>e.value), productTop.map(e=> productDivisor ? e.total/productDivisor : e.total), {
       color:"#8B7CF6", focus: state.productFocus,
       onClick:(label)=>{
         state.productFocus = state.productFocus === label ? null : label;
@@ -801,11 +807,12 @@
       : baseRows;
     const suffix = state.productFocus ? ` — ${state.productFocus}` : " — ทุก Product";
 
-    $("#productTeamTitle").textContent = "แยกตาม Team" + suffix;
+    const teamDivisor = monthDivisor(scoped);
+    $("#productTeamTitle").textContent = (teamDivisor ? "ค่าเฉลี่ยต่อเดือน — Team" : "แยกตาม Team") + suffix;
     if (state.teamCol) {
       const teamTop = topBreakdown(scoped, state.teamCol, 10);
       setChartWrapHeight("productTeamChart", teamTop.length);
-      drawSimpleBar("productTeamChart", teamTop.map(e=>e.value), teamTop.map(e=>e.total), { color:"#38DBEA" });
+      drawSimpleBar("productTeamChart", teamTop.map(e=>e.value), teamTop.map(e=> teamDivisor ? e.total/teamDivisor : e.total), { color:"#38DBEA" });
     }
 
     if (state.monthCol) {
@@ -838,8 +845,10 @@
     section.style.display = "";
     const baseRows = state.filteredRows;
 
+    const mainDivisor = monthDivisor(baseRows);
+    $("#mainCatTitle").textContent = mainDivisor ? "ค่าเฉลี่ยต่อเดือนตาม Main Category" : "ยอดรวมตาม Main Category";
     const mainTop = topBreakdown(baseRows, state.mainCatCol, 10);
-    drawSimpleBar("mainCatChart", mainTop.map(e=>e.value), mainTop.map(e=>e.total), {
+    drawSimpleBar("mainCatChart", mainTop.map(e=>e.value), mainTop.map(e=> mainDivisor ? e.total/mainDivisor : e.total), {
       color:"#3DDC97", focus: state.categoryFocus,
       onClick:(label)=>{
         state.categoryFocus = state.categoryFocus === label ? null : label;
@@ -850,10 +859,12 @@
     const scoped = state.categoryFocus
       ? baseRows.filter(r => (String(r[state.mainCatCol]||"").trim() || "ไม่ระบุ") === state.categoryFocus)
       : baseRows;
-    $("#subCatTitle").textContent = "ยอดรวมตาม Sub Category" + (state.categoryFocus ? ` — ${state.categoryFocus}` : " — ทุก Main Category");
+    const subDivisor = monthDivisor(scoped);
+    const subLabel = subDivisor ? "ค่าเฉลี่ยต่อเดือนตาม Sub Category" : "ยอดรวมตาม Sub Category";
+    $("#subCatTitle").textContent = subLabel + (state.categoryFocus ? ` — ${state.categoryFocus}` : " — ทุก Main Category");
     if (state.subCatCol) {
       const subTop = topBreakdown(scoped, state.subCatCol, 10);
-      drawSimpleBar("subCatChart", subTop.map(e=>e.value), subTop.map(e=>e.total), { color:"#FF6FA0" });
+      drawSimpleBar("subCatChart", subTop.map(e=>e.value), subTop.map(e=> subDivisor ? e.total/subDivisor : e.total), { color:"#FF6FA0" });
     }
   }
   function renderCategoryFocusChip(){
@@ -884,8 +895,9 @@
     if (!col) return;
     const rows = state.filteredRows;
     const breakdown = computeBreakdown(rows, col).sort((a,b)=>b.total-a.total);
+    const divisor = monthDivisor(rows);
 
-    $("#breakdownBarTitle").textContent = "ยอดรวมแยกตาม " + col;
+    $("#breakdownBarTitle").textContent = (divisor ? "ค่าเฉลี่ยต่อเดือนแยกตาม " : "ยอดรวมแยกตาม ") + col;
 
     const topN = 10;
     let barLabels, barData;
@@ -893,9 +905,10 @@
       const top = breakdown.slice(0,topN); const restSum = breakdown.slice(topN).reduce((a,e)=>a+e.total,0);
       barLabels = top.map(e=>e.value).concat(["อื่นๆ"]); barData = top.map(e=>e.total).concat([restSum]);
     } else { barLabels = breakdown.map(e=>e.value); barData = breakdown.map(e=>e.total); }
+    if (divisor) barData = barData.map(v=>v/divisor);
 
     drawBreakdownBar(barLabels, barData, col, breakdown.length > topN ? barLabels.slice(0,-1) : null);
-    renderBreakdownTable(breakdown, col);
+    renderBreakdownTable(breakdown, col, divisor);
   }
 
   function drawBreakdownBar(labels, data, col, otherExcludeList){
@@ -950,9 +963,10 @@
     });
   }
 
-  function renderBreakdownTable(breakdown, col){
+  function renderBreakdownTable(breakdown, col, divisor){
     const head = $("#breakdownHeadRow");
-    const cols = [ {k:"value", label:col}, {k:"total", label:"ยอดรวม"}, {k:"pct", label:"% ของยอดรวม"}, {k:"count", label:"จำนวนรายการ"}, {k:"avg", label:"เฉลี่ย/รายการ"} ];
+    const totalLabel = divisor ? "เฉลี่ย/เดือน" : "ยอดรวม";
+    const cols = [ {k:"value", label:col}, {k:"total", label:totalLabel}, {k:"pct", label:"% ของยอดรวม"}, {k:"count", label:"จำนวนรายการ"}, {k:"avg", label:"เฉลี่ย/รายการ"} ];
     head.innerHTML = "";
     cols.forEach(c=>{
       const th = document.createElement("th");
@@ -979,7 +993,7 @@
       const pctWidth = Math.min(100, Math.abs(e.total)/maxTotal*100);
       tr.innerHTML = `
         <td>${e.value}</td>
-        <td class="num">${fmtBaht(e.total)}</td>
+        <td class="num">${fmtBaht(divisor ? e.total/divisor : e.total)}</td>
         <td class="num"><div class="mini-bar-cell"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pctWidth}%;"></div></div><span>${Math.round(e.pct)}%</span></div></td>
         <td class="num">${fmtNum(e.count,0)}</td>
         <td class="num">${fmtBaht(e.avg)}</td>`;
