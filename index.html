@@ -336,7 +336,7 @@
     <div class="dim-tabs" id="dimTabs"></div>
     <div class="breakdown-grid">
       <div class="chart-card"><h3 id="breakdownBarTitle">ยอดรวม</h3><div class="chart-wrap"><canvas id="breakdownBarChart"></canvas></div></div>
-      <div class="chart-card"><h3>สัดส่วนตาม Frequency</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
+      <div class="chart-card"><h3 id="frequencyDonutTitle">สัดส่วนตาม Frequency</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
     </div>
     <div class="table-wrap">
       <table>
@@ -696,7 +696,7 @@
   }
   function monthDivisor(rows){
     const n = distinctMonthCount(rows);
-    return (n && n > 2) ? n : null;
+    return (n && n > 0) ? n : null;
   }
 
   function renderTrend(){
@@ -752,9 +752,11 @@
     if (!state.frequencyCol || !state.amountCol) { if (card) card.style.display = "none"; return; }
     if (card) card.style.display = "";
     const rows = state.filteredRows;
+    const divisor = monthDivisor(rows);
+    $("#frequencyDonutTitle").textContent = divisor ? "ค่าเฉลี่ยต่อเดือนตาม Frequency" : "สัดส่วนตาม Frequency";
     const breakdown = computeBreakdown(rows, state.frequencyCol).sort((a,b)=>b.total-a.total);
     const labels = breakdown.map(e=>e.value);
-    const data = breakdown.map(e=>e.total);
+    const data = breakdown.map(e=> divisor ? e.total/divisor : e.total);
     drawBreakdownDonut(labels.length ? labels : ["ไม่มีข้อมูล"], labels.length ? data : [0], state.frequencyCol);
   }
 
