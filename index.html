@@ -374,6 +374,7 @@
   ];
   const AMOUNT_HINTS = ["จำนวนเงิน","ยอด","ค่าใช้จ่าย","บาท","เงิน","amout","amount","cost","expense","price","total","revenue","budget"];
 
+  let tableSentinelObserver = null;
   const state = {
     headers: [], rows: [], dimHeaders: [], amountCol: null, yearCol: null, monthCol: null,
     filters: {}, filteredRows: [],
@@ -443,7 +444,7 @@
     $("#loadingMsg").style.display = "block"; $("#errorMsg").style.display = "none";
     setStatus("กำลังโหลด…");
     Papa.parse(url, {
-      download: true, header: true, skipEmptyLines: true,
+      download: true, header: true, skipEmptyLines: true, worker: true,
       complete: function(results){
         if (!results.data || results.data.length === 0) { showError("โหลดสำเร็จแต่ไม่พบข้อมูลในชีท ตรวจสอบว่าแท็บที่ Publish to web ถูกต้องหรือไม่"); return; }
         const headers = results.meta.fields.filter(h => h && h.trim() !== "");
@@ -533,11 +534,11 @@
 
   function updateFacetCounts(){
     state.dimHeaders.forEach(h=>{
+      const panel = $(`.filter-panel[data-col="${CSS.escape(h)}"]`);
+      if (!panel || panel.dataset.built !== "1") return;
       const rows = rowsExcludingFilter(h);
       const counts = {};
       rows.forEach(r=>{ const v = String(r[h]||"").trim(); if (v) counts[v]=(counts[v]||0)+1; });
-      const panel = $(`.filter-panel[data-col="${CSS.escape(h)}"]`);
-      if (!panel) return;
       $$(".opt-row", panel).forEach(row=>{
         const val = row.dataset.value;
         const n = counts[val] || 0;
@@ -557,7 +558,7 @@
       const btn = document.createElement("button"); btn.className = "filter-btn";
       btn.innerHTML = `<span>${h}</span><span class="arrow">▾</span>`;
       wrap.appendChild(btn);
-      const panel = document.createElement("div"); panel.className = "filter-panel"; panel.dataset.col = h;
+      const panel = document.createElement("div"); panel.className = "filter-panel"; panel.dataset.col = h; panel.dataset.built = "0";
       state.filters[h] = state.filters[h] || {selected: new Set(valueCounts.map(v=>v[0]))};
 
       const search = document.createElement("input");
@@ -565,6 +566,7 @@
       panel.appendChild(search);
       const list = document.createElement("div"); list.className = "opt-list";
       function renderOpts(filterText){
+        panel.dataset.built = "1";
         list.innerHTML = "";
         valueCounts.forEach(([val,count])=>{
           if (filterText && !val.toLowerCase().includes(filterText.toLowerCase())) return;
@@ -580,7 +582,7 @@
           list.appendChild(row);
         });
       }
-      renderOpts(""); search.addEventListener("input", ()=>renderOpts(search.value));
+      search.addEventListener("input", ()=>renderOpts(search.value));
       panel.appendChild(list);
       const actions = document.createElement("div"); actions.className = "panel-actions";
       actions.innerHTML = `<button class="link-btn" data-act="all">เลือกทั้งหมด</button><button class="link-btn" data-act="none">ไม่เลือกเลย</button>`;
@@ -595,7 +597,9 @@
       btn.addEventListener("click", (e)=>{
         e.stopPropagation();
         $$(".filter-panel.open").forEach(p=>{ if(p!==panel) p.classList.remove("open"); });
+        const opening = !panel.classList.contains("open");
         panel.classList.toggle("open");
+        if (opening && panel.dataset.built === "0") renderOpts("");
       });
       wrap.appendChild(panel); bar.appendChild(wrap);
       updateFilterBtnLabel(btn, h, valueCounts.length);
@@ -1173,24 +1177,48 @@
       });
     }
     const body = $("#tableBody"); body.innerHTML = "";
+    $("#rowCountLabel").textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
+    if (tableSentinelObserver) { tableSentinelObserver.disconnect(); tableSentinelObserver = null; }
     if (rows.length === 0) {
       body.innerHTML = `<tr class="empty-row"><td colspan="${state.headers.length}">ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
-    } else {
+      return;
+    }
+    const CHUNK = 150;
+    let rendered = 0;
+    function renderChunk(){
       const frag = document.createDocumentFragment();
-      rows.forEach(r=>{
+      const end = Math.min(rendered + CHUNK, rows.length);
+      for (let idx = rendered; idx < end; idx++){
+        const r = rows[idx];
         const tr = document.createElement("tr");
-        state.headers.forEach((h, i)=>{
+        state.headers.forEach(h=>{
           const td = document.createElement("td");
           if (h === state.amountCol) td.className = "num";
-          let val = r[h] !== undefined && r[h] !== null ? r[h] : "";
-          td.textContent = val;
+          td.textContent = r[h] !== undefined && r[h] !== null ? r[h] : "";
           tr.appendChild(td);
         });
         frag.appendChild(tr);
-      });
+      }
+      rendered = end;
       body.appendChild(frag);
+      if (rendered < rows.length) armSentinel(); 
     }
-    $("#rowCountLabel").textContent = `${rows.length.toLocaleString("th-TH")} รายการ`;
+    function armSentinel(){
+      const sentinel = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = state.headers.length; td.style.padding = "0"; td.style.border = "none"; td.style.height = "1px";
+      sentinel.appendChild(td);
+      body.appendChild(sentinel);
+      tableSentinelObserver = new IntersectionObserver((entries)=>{
+        if (entries[0].isIntersecting) {
+          tableSentinelObserver.disconnect(); tableSentinelObserver = null;
+          sentinel.remove();
+          renderChunk();
+        }
+      }, { root: $("#rawTableWrap"), rootMargin: "300px" });
+      tableSentinelObserver.observe(sentinel);
+    }
+    renderChunk();
   }
 
   $("#refreshBtn").addEventListener("click", ()=> loadData($("#csvUrlInput").value.trim()));
