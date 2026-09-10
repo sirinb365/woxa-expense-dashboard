@@ -336,7 +336,7 @@
     <div class="dim-tabs" id="dimTabs"></div>
     <div class="breakdown-grid">
       <div class="chart-card"><h3 id="breakdownBarTitle">ยอดรวม</h3><div class="chart-wrap"><canvas id="breakdownBarChart"></canvas></div></div>
-      <div class="chart-card"><h3>สัดส่วนตามเดือน</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
+      <div class="chart-card"><h3>สัดส่วนตาม Frequency</h3><div class="chart-wrap"><canvas id="breakdownDonutChart"></canvas></div></div>
     </div>
     <div class="table-wrap">
       <table>
@@ -361,7 +361,7 @@
   </section>
 </main>
 
-<footer>Woxa Expense Dashboard · ข้อมูลอัปเดตจาก Google Sheet</footer>
+<footer>Woxa Expense Dashboard — ห้ามเผยแพร่ข้อมูลต่อเด็ดขาด</footer>
 
 <script>
 (function(){
@@ -382,7 +382,7 @@
     autoRefreshTimer: null, breakdownBarChart: null, breakdownDonutChart: null, trendChart: null,
     activeDimension: null,
     drill: null,
-    productCol: null, teamCol: null, mainCatCol: null, subCatCol: null,
+    productCol: null, teamCol: null, mainCatCol: null, subCatCol: null, frequencyCol: null,
     productFocus: null, categoryFocus: null, chartInstances: {},
     breakdownSortCol: "total", breakdownSortDir: -1
   };
@@ -458,6 +458,7 @@
         state.teamCol = resolveColumnName("Team", headers);
         state.mainCatCol = resolveColumnName("Main Category", headers);
         state.subCatCol = resolveColumnName("Sub Category", headers);
+        state.frequencyCol = resolveColumnName("Frequency", headers);
         state.productFocus = null; state.categoryFocus = null;
         state.filters = {}; state.page = 1; state.drill = null;
         state.activeDimension = resolveColumnName("Main Category", headers) && state.dimHeaders.includes(resolveColumnName("Main Category", headers))
@@ -505,7 +506,7 @@
     applyFilters(); renderSummary();
     try { renderTrend(); } catch(e){ console.error("renderTrend failed:", e); }
     try { renderBreakdown(); } catch(e){ console.error("renderBreakdown failed:", e); }
-    try { renderMonthlyDonut(); } catch(e){ console.error("renderMonthlyDonut failed:", e); }
+    try { renderFrequencyDonut(); } catch(e){ console.error("renderFrequencyDonut failed:", e); }
     try { renderProductCategoryDonut(); } catch(e){ console.error("renderProductCategoryDonut failed:", e); }
     try { renderProductAnalysis(); renderProductFocusChip(); } catch(e){ console.error("renderProductAnalysis failed:", e); }
     try { renderCategoryAnalysis(); renderCategoryFocusChip(); } catch(e){ console.error("renderCategoryAnalysis failed:", e); }
@@ -744,20 +745,17 @@
     });
   }
 
-  function renderMonthlyDonut(){
+  function renderFrequencyDonut(){
     const canvasEl = $("#breakdownDonutChart");
     if (!canvasEl) return;
-    if (!state.monthCol || !state.amountCol) return;
+    const card = canvasEl.closest(".chart-card");
+    if (!state.frequencyCol || !state.amountCol) { if (card) card.style.display = "none"; return; }
+    if (card) card.style.display = "";
     const rows = state.filteredRows;
-    const totals = Array(12).fill(0);
-    rows.forEach(r=>{
-      const mi = monthIndexOf(r[state.monthCol]);
-      if (mi === null) return;
-      totals[mi] += parseNumberValue(r[state.amountCol]) || 0;
-    });
-    const labels = [], data = [];
-    MONTH_ABBR_EN.forEach((name,i)=>{ if (totals[i] !== 0) { labels.push(name); data.push(totals[i]); } });
-    drawBreakdownDonut(labels.length? labels : MONTH_ABBR_EN, labels.length? data : Array(12).fill(0));
+    const breakdown = computeBreakdown(rows, state.frequencyCol).sort((a,b)=>b.total-a.total);
+    const labels = breakdown.map(e=>e.value);
+    const data = breakdown.map(e=>e.total);
+    drawBreakdownDonut(labels.length ? labels : ["ไม่มีข้อมูล"], labels.length ? data : [0], state.frequencyCol);
   }
 
   // Fixed classification of the Product column into 4 report buckets.
@@ -1064,7 +1062,7 @@
     };
   }
 
-  function drawBreakdownDonut(labels, data){
+  function drawBreakdownDonut(labels, data, col){
     const ctx = $("#breakdownDonutChart").getContext("2d");
     if (state.breakdownDonutChart) state.breakdownDonutChart.destroy();
     const total = data.reduce((a,b)=>a+b,0);
@@ -1075,11 +1073,9 @@
       options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
         onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
         onClick:(evt, els)=>{
-          if (!els.length || !state.monthCol) return;
-          const idx = els[0].index; const monthName = labels[idx];
-          const mi = MONTH_ABBR_EN.indexOf(monthName);
-          if (mi === -1) return;
-          setDrill(`${state.monthCol} = ${monthName}`, row => monthIndexOf(row[state.monthCol]) === mi, `monthOnly::${mi}`);
+          if (!els.length || !col) return;
+          const label = labels[els[0].index];
+          setDrill(`${col} = ${label}`, row => (String(row[col]||"").trim() || "ไม่ระบุ") === label, `donut::${col}::${label}`);
         },
         plugins:{
           legend:{ position:"right", labels:{ color:"rgba(245,246,252,.82)", font:{family:"IBM Plex Sans Thai", size:11}, boxWidth:11, padding:9 } },
