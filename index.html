@@ -789,15 +789,16 @@
 
     const ctx = canvasEl.getContext("2d");
     if (state.chartInstances["productCategoryDonut"]) state.chartInstances["productCategoryDonut"].destroy();
-    const total = data.reduce((a,b)=>a+b,0);
+    const total = data.reduce((a,b)=>a+Math.abs(b),0);
+    const percents = roundPercentages(data, total);
     const chart = new Chart(ctx, {
       type:"doughnut",
       data:{ labels: PRODUCT_CATEGORY_ORDER, datasets:[{ data, backgroundColor: PRODUCT_CATEGORY_COLORS, borderColor:"rgba(11,14,30,.85)", borderWidth:2 }] },
-      plugins:[donutPercentPlugin()],
+      plugins:[donutPercentPlugin(percents)],
       options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
         plugins:{
           legend:{ position:"right", labels:{ color:"rgba(245,246,252,.82)", font:{family:"IBM Plex Sans Thai", size:11}, boxWidth:11, padding:9 } },
-          tooltip:{ callbacks:{ label:(c)=>{ const pct = total ? Math.round(c.parsed/total*100) : 0; return " " + c.label + ": " + fmtBaht(c.parsed) + " (" + pct + "%)"; } } }
+          tooltip:{ callbacks:{ label:(c)=> " " + c.label + ": " + fmtBaht(c.parsed) + " (" + percents[c.dataIndex] + "%)" } }
         } }
     });
     state.chartInstances["productCategoryDonut"] = chart;
@@ -816,13 +817,27 @@
 
   function chartColors(){ return ["#8B7CF6","#38DBEA","#FFC069","#FF6FA0","#3DDC97","#5B9DFF","#FF7A59","#B98AF0"]; }
 
+  // Largest-remainder rounding: rounds each share to a whole percent while guaranteeing
+  // the set sums to exactly 100 (plain independent Math.round per item can overshoot/undershoot).
+  function roundPercentages(values, total){
+    if (!total) return values.map(()=>0);
+    const raw = values.map(v => Math.abs(v)/total*100);
+    const floors = raw.map(Math.floor);
+    const used = floors.reduce((a,b)=>a+b,0);
+    let remainder = Math.round(100 - used);
+    const order = raw.map((v,i)=>({i, frac: v - floors[i]})).sort((a,b)=>b.frac-a.frac);
+    const result = floors.slice();
+    for (let k=0; k<remainder && k<order.length; k++) result[order[k].i] += 1;
+    return result;
+  }
+
   // Draws a rounded "N%" label next to (horizontal) or above (vertical) each bar, share of that chart's own total.
-  function percentLabelPlugin(horizontal){
+  // percents: precomputed array (via roundPercentages) so the drawn labels always add up to 100%.
+  function percentLabelPlugin(horizontal, percents){
     return {
       id: "pctLabels",
       afterDatasetsDraw(chart){
         const dataArr = chart.data.datasets[0].data;
-        const total = dataArr.reduce((a,b)=>a+Math.abs(b),0) || 1;
         const meta = chart.getDatasetMeta(0);
         const ctx = chart.ctx;
         ctx.save();
@@ -830,7 +845,7 @@
         ctx.fillStyle = "rgba(245,246,252,.9)";
         meta.data.forEach((bar, i)=>{
           const val = dataArr[i]; if (val === undefined || val === null) return;
-          const pct = Math.round(Math.abs(val)/total*100);
+          const pct = percents[i];
           const pos = bar.tooltipPosition();
           if (horizontal) { ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(pct + "%", pos.x + 6, pos.y); }
           else { ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(pct + "%", pos.x, pos.y - 4); }
@@ -850,10 +865,12 @@
     const baseColor = opts.color || "#8B7CF6";
     const colors = labels.map(lab => opts.focus ? (lab === opts.focus ? baseColor : "rgba(255,255,255,.14)") : baseColor);
     const horizontal = opts.horizontal !== false;
+    const barTotal = data.reduce((a,b)=>a+Math.abs(b),0);
+    const barPercents = roundPercentages(data, barTotal);
     const chart = new Chart(ctx, {
       type:"bar",
       data:{ labels, datasets:[{ data, backgroundColor: colors, borderRadius:4 }] },
-      plugins:[percentLabelPlugin(horizontal)],
+      plugins:[percentLabelPlugin(horizontal, barPercents)],
       options:{ indexAxis: horizontal ? "y" : "x", responsive:true, maintainAspectRatio:false,
         layout: horizontal ? { padding:{ right:34 } } : { padding:{ top:18 } },
         interaction:{ mode:"nearest", axis: horizontal ? "y" : "x", intersect:false },
@@ -994,6 +1011,9 @@
     if (!col) return;
     const rows = state.filteredRows;
     const breakdown = computeBreakdown(rows, col).sort((a,b)=>b.total-a.total);
+    const tableGrandTotal = breakdown.reduce((a,e)=>a+Math.abs(e.total),0);
+    const tablePercents = roundPercentages(breakdown.map(e=>e.total), tableGrandTotal);
+    breakdown.forEach((e,i)=>{ e.pctRounded = tablePercents[i]; });
     const divisor = monthDivisor(rows);
 
     $("#breakdownBarTitle").textContent = (divisor ? "ค่าเฉลี่ยต่อเดือนแยกตาม " : "ยอดรวมแยกตาม ") + col;
@@ -1013,10 +1033,12 @@
   function drawBreakdownBar(labels, data, col, otherExcludeList){
     const ctx = $("#breakdownBarChart").getContext("2d");
     if (state.breakdownBarChart) state.breakdownBarChart.destroy();
+    const barTotal = data.reduce((a,b)=>a+Math.abs(b),0);
+    const barPercents = roundPercentages(data, barTotal);
     state.breakdownBarChart = new Chart(ctx, {
       type:"bar",
       data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderRadius:4 }] },
-      plugins:[percentLabelPlugin(true)],
+      plugins:[percentLabelPlugin(true, barPercents)],
       options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
         layout:{ padding:{ right:34 } },
         interaction:{ mode:"nearest", axis:"y", intersect:false },
@@ -1039,12 +1061,11 @@
         } }
     });
   }
-  function donutPercentPlugin(){
+  function donutPercentPlugin(percents){
     return {
       id: "donutPct",
       afterDatasetsDraw(chart){
         const dataArr = chart.data.datasets[0].data;
-        const total = dataArr.reduce((a,b)=>a+Math.abs(b),0) || 1;
         const meta = chart.getDatasetMeta(0);
         const ctx = chart.ctx;
         ctx.save();
@@ -1052,7 +1073,7 @@
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         meta.data.forEach((arc,i)=>{
           const val = dataArr[i]; if (!val) return;
-          const pct = Math.round(Math.abs(val)/total*100);
+          const pct = percents[i];
           if (pct < 4) return;
           const pos = arc.getCenterPoint ? arc.getCenterPoint() : arc.tooltipPosition();
           const label = pct + "%";
@@ -1067,11 +1088,12 @@
   function drawBreakdownDonut(labels, data, col){
     const ctx = $("#breakdownDonutChart").getContext("2d");
     if (state.breakdownDonutChart) state.breakdownDonutChart.destroy();
-    const total = data.reduce((a,b)=>a+b,0);
+    const total = data.reduce((a,b)=>a+Math.abs(b),0);
+    const percents = roundPercentages(data, total);
     state.breakdownDonutChart = new Chart(ctx, {
       type:"doughnut",
       data:{ labels, datasets:[{ data, backgroundColor: chartColors(), borderColor:"rgba(11,14,30,.85)", borderWidth:2 }] },
-      plugins:[donutPercentPlugin()],
+      plugins:[donutPercentPlugin(percents)],
       options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
         onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length ? "pointer" : "default"; },
         onClick:(evt, els)=>{
@@ -1081,7 +1103,7 @@
         },
         plugins:{
           legend:{ position:"right", labels:{ color:"rgba(245,246,252,.82)", font:{family:"IBM Plex Sans Thai", size:11}, boxWidth:11, padding:9 } },
-          tooltip:{ callbacks:{ label:(c)=>{ const pct= total? Math.round(c.parsed/total*100):0; return " " + c.label + ": " + fmtBaht(c.parsed) + " (" + pct + "%)"; } } }
+          tooltip:{ callbacks:{ label:(c)=> " " + c.label + ": " + fmtBaht(c.parsed) + " (" + percents[c.dataIndex] + "%)" } }
         } }
     });
   }
@@ -1117,7 +1139,7 @@
       tr.innerHTML = `
         <td>${e.value}</td>
         <td class="num">${fmtBaht(divisor ? e.total/divisor : e.total)}</td>
-        <td class="num"><div class="mini-bar-cell"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pctWidth}%;"></div></div><span>${Math.round(e.pct)}%</span></div></td>
+        <td class="num"><div class="mini-bar-cell"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pctWidth}%;"></div></div><span>${e.pctRounded}%</span></div></td>
         <td class="num">${fmtNum(e.count,0)}</td>
         <td class="num">${fmtBaht(e.avg)}</td>`;
       tr.addEventListener("click", ()=>{
