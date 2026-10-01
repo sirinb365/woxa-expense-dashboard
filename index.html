@@ -762,10 +762,10 @@
 
   // Fixed classification of the Product column into 4 report buckets.
   function classifyProduct(rawValue){
-    const v = String(rawValue||"").toLowerCase();
-    if (v.includes("iux")) return "IUX";
-    if (v.includes("bd")) return "BD";
-    if (v.includes("salary") || v.includes("เงินเดือน")) return "Salary";
+    const v = String(rawValue||"").trim().toLowerCase();
+    if (v === "iux") return "IUX";
+    if (v === "bd") return "BD";
+    if (v === "salary" || v === "เงินเดือน") return "Salary";
     return "Other";
   }
   const PRODUCT_CATEGORY_ORDER = ["IUX","BD","Salary","Other"];
